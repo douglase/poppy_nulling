@@ -1,0 +1,362 @@
+#from poppy
+import poppy
+from matplotlib.colors import LogNorm, Normalize  # for log scaling of images, with automatic colorbar support
+import astropy.io.fits as fits
+import matplotlib.pyplot as plt
+import matplotlib
+import logging
+import numpy as np
+import astropy
+import time
+from numpy.lib.stride_tricks import as_strided as ast
+
+# internal constants for types of plane
+_PUPIL = 1
+_IMAGE = 2
+_DETECTOR = 3 # specialized type of image plane.
+_ROTATION = 4 # not a real optic, just a coordinate transform
+_typestrs = ['', 'Pupil plane', 'Image plane', 'Detector', 'Rotation']
+
+def draw_circle(r,dr,amp,cube=False):
+	'''r is in radius, r+dr is outer radius.
+	Given a data cube this function puts each value on its own plane
+	given a plane, each value is added to the 2D array
+
+	each value has intensity equal to amp/(number of values).
+	'''
+	array=np.zeros([512,512])
+	centerx=array.shape[0]/2.0
+	centery=array.shape[1]/2.0
+	num_targ=0.0
+	for i in range(array.shape[0]):
+		for j in range(array.shape[1]):
+			if ((i-centerx)**2+(j-centery)**2 <= (r+dr)**2) and ((i-centerx)**2+(j-centery)**2 >= r**2):
+				if not cube:
+					array[i,j]=amp
+					num_targ=num_targ + 1.0
+				if cube:
+					plane=array.copy()
+					plane[i,j]=amp
+					array=np.dstack((array,plane))
+					num_targ=num_targ + 1.0
+	#
+	array=array/num_targ
+	return array
+
+def TiltfromField(field,arcsec_per_pixel,zero_init_wavefront=True):
+	'''try:
+		field = fitsfield.data
+	except Exception, err:
+		raise ValueError('Problem Loading fits file to generate field, making no change to input wavefront. Because:'+str(err))
+		return inwave'''
+
+	center=int(np.round(np.shape(field)[0]/2.0))
+		
+	#centery=(np.shape(field))[1]/2.0
+	npix=field.shape[0]
+        #npix = self.planes[0].shape[0] if self.planes[0].shape is not None else 1024
+	# $iam = self.planes[0].pupil_diam if hasattr(self.planes[0], 'pupil_diam') else 8
+
+	points=np.array(np.where(field>0))
+
+	tiltlist=np.zeros([3,points.shape[1]])
+	
+	for index in range(points.shape[1]):
+		point=((points[0,index]),(points[1,index]))
+				
+		i=point[0]
+		j=point[1]
+		flux=field[point]
+		tiltlist[2,index]=flux
+		r_pixel=arcsec_per_pixel*np.sqrt((i-center)**2+(j-center)**2) #arcsec
+		angle=np.angle(complex((j-center),(i-center))) #radians.
+		offset_x = r_pixel *-np.sin(angle)  # convert to offset X,Y in arcsec
+		offset_y = r_pixel * np.cos(angle)  # using the usual astronomical angle convention
+		tiltlist[0,index]=offset_x
+		tiltlist[1,index]=offset_y
+        return tiltlist
+
+def add_poisson_noise(photons):
+	'''takes a numpy array of  values and finds a 
+	random number from a poisson distribution centered 
+	on the number of photons in that bin'''
+	from scipy.stats import poisson
+	
+	vpoisson_rvs=np.vectorize(poisson.rvs) 
+
+	if str(type(input)) == "<class 'astropy.io.fits.hdu.hdulist.HDUList'>":
+		noisy_array=vpoisson_rvs(photons[0].data)
+		noisy = fits.HDUList(fits.PrimaryHDU(data=noisy_array,header=photons[0].header))
+	else:
+		noisy=vpoisson_rvs(photons)
+	return noisy
+
+
+class NullingCoronagraph(poppy.OpticalSystem):
+    print('nulling class')
+    """
+    based on POPPY Module:SemiAnalyticCoronagraph
+
+
+
+    Parameters
+    -----------
+    ExistingOpticalSystem : OpticalSystem
+        An optical system which can be converted into a SemiAnalyticCoronagraph. This
+        means it must have exactly 4 planes, in order Pupil, Image, Pupil, Detector.
+    oversample : int
+        Oversampling factor in intermediate image plane. Default is 8
+
+    """
+
+    def __init__(self, ExistingOpticalSystem,
+		 oversample=8,
+		 occulter_box = 1.0,
+		 wavelength=0.633e-6,
+                 normalize='last',
+		 save_intermediates=False, display_intermediates=True,
+                 intermediate_fn=None,
+		 poly_weight=None,
+		 shear=0.3,
+		 nrows=6,
+		 intensity_mismatch=0.000,
+		 phase_mismatch_fits=False,
+		 field_arcsec_per_pixel=2.0/64.0,
+		 dm_meters_pixel=0, dm_flat_fits=False,
+		 pupilmask=False,verbose=True,defocus=False):
+
+        self.phase_mismatch_fits=phase_mismatch_fits
+	self.pupilmask=pupilmask
+	self.normalize=normalize
+        self.name = "SemiAnalyticCoronagraph for "+ExistingOpticalSystem.name
+        self.verbose =verbose
+        self.source_offset_r = ExistingOpticalSystem.source_offset_r
+        self.source_offset_theta = ExistingOpticalSystem.source_offset_theta
+        self.planes = ExistingOpticalSystem.planes
+        self.intensity_mismatch=intensity_mismatch
+	self.wavelength=wavelength
+	self.save_intermediates=save_intermediates
+	self.display_intermediates=display_intermediates
+	self.dm_meters_pixel=dm_meters_pixel
+	self.field_arcsec_per_pixel=field_arcsec_per_pixel
+	self.shear=shear
+	self.defocus=defocus
+	self.nullerstatus=False
+	self.dm_flat_fits=dm_flat_fits
+	self._default_display_size= 20.
+        try:
+		self.inputpupil = self.planes[0]
+		# self.occulter = self.planes[1]
+		#self.lyotplane = self.planes[2]
+		self.detector = self.planes[-1]
+        except Exception,err:
+		print(err)
+        self.oversample = oversample
+	
+    def null(self,wavelength=0.633e-6,wave_weight=1,flux=1.0,offset_x=0.0,offset_y=0.0):
+	'''
+	nulls the Nulling Coronagraph according to the optical system prescription.
+	After null runs, the nullstatus is set to True.
+	Returns: a tuple of the dark and bright outputs: (self.wavefront, wavefront_bright).
+	Flux should be counts/second.
+	'''
+	if poppy.settings.enable_speed_tests():
+		t_start = time.time()
+
+	wavefront = self.inputWavefront(wavelength)
+
+	if  poppy.settings.enable_flux_tests(): _log.debug("Wavefront initialized,  Flux === "+str(wavefront.totalIntensity))
+
+	print(wavefront.wavefront.real.max())
+
+        if self.save_intermediates:
+            raise NotImplemented("not yet")
+        if self.display_intermediates:
+            suptitle = plt.suptitle( "Propagating $\lambda=$ %.3f $\mu$m" % (self.wavelength*1.0e6), size='x-large')
+
+            nrows = 6
+            #plt.clf()
+            wavefront.display(what='intensity',nrows=nrows,row=1, colorbar=False)
+        wavefront *= self.inputpupil
+	if self.defocus:
+		wavefront *= self.defocus
+	wavefront.normalize()
+	wavefront *= np.sqrt(flux)
+	_log.debug("Normalized all planes, after the unobscured aperture, then multiplied by incident flux %s",str(flux))
+	if  poppy.settings.enable_flux_tests(): _log.debug("Wavefront multiplied by flux,  Flux === "+str(wavefront.totalIntensity))
+
+        self.obscuration=poppy.FITSOpticalElement(transmission='FITS/aperture_brianfeb2013.fits',pixelscale=self.dm_meters_pixel,oversample=False,opdunits='meters')# DM pupil.
+	wavefront_ideal = wavefront.copy()
+        wavefront_ideal.wavefront=np.ones(wavefront.shape)
+        wavefront_ideal *=  self.inputpupil
+	
+	if not self.pupilmask:
+		wavefront *= self.obscuration
+		wavefront_ideal *=  self.obscuration
+
+	'''	if self.fitsfield:
+		InputWavefrontFromField(wavefront,self.fitsfield,self.field_arcsec_per_pixel)
+		_log.debug("Gonna depreciate fitsfield.")
+	'''
+
+	if (offset_x!=0) or (offset_y !=0):
+		wavefront.tilt(Xangle=offset_x, Yangle=offset_y)
+		_log.debug("Tilted wavefront by theta_X=%f, theta_Y=%f arcsec, for target with flux of %f" % (offset_x, offset_y,flux))
+	else:
+		_log.debug("No Tilt. Target with flux of %f" % (flux))
+ 			   
+        def sheararray(inputwavefront,shear):
+		sheared = np.roll(inputwavefront,int(round(inputwavefront.shape[0]*shear)))
+		return sheared
+
+        wavefront_arm = wavefront.copy()
+        wavefront_bright= wavefront.copy()
+	
+	if not self.pupilmask:
+		mask= wavefront_ideal.wavefront + sheararray(wavefront_ideal.wavefront,self.shear)
+		mask_array=np.zeros(wavefront.shape)
+		mask_array[np.where(mask  >1.1 )]=1.0
+		mask_array[np.where(mask < 1)]=0
+		#force area wrapped back over the leading edge to zero:
+		mask_array[:,0:int(round(wavefront.wavefront.shape[0]*self.shear))]=0
+		self.mask_array = mask_array
+
+        else:
+		self.FITSmask=poppy.FITSOpticalElement(transmission=self.pupilmask,planetype=_PUPIL,rotation=-45,oversample=False)     
+		print(self.FITSmask.pixelscale)
+		#offset mask onto the sheared array
+		self.mask_array = np.roll(self.FITSmask.amplitude,int(round(self.FITSmask.amplitude.shape[0]*self.shear)/2.0))
+	
+        #calculate the effect of phase differences between the arms:
+        if self.phase_mismatch_fits:
+		#this also filters out the dead actuators.
+		#let the dead actuators through: not implimented.
+		#DM pupil.
+		DM_array=poppy.FITSOpticalElement(opd=self.phase_mismatch_fits,pixelscale=self.dm_meters_pixel,oversample=False,opdunits='meters',rotation=225)
+		#a low passed version to subtract, simulating flattening the DM:
+		if self.dm_flat_fits:
+			# DM pupil:
+			DM_flat=poppy.FITSOpticalElement(opd=self.dm_flat_fits,pixelscale=self.dm_meters_pixel,oversample=False,opdunits='meters',rotation=225)
+			DM_array.opd=DM_array.opd-DM_flat.opd
+			#center DM on mask:
+			DM_array.opd= sheararray(DM_array.opd,-self.shear/2.0)
+		DM_array.opd=DM_array.opd
+		_log.debug("RMS wavefront error in mismatched arm, (includes beyond mask):"+str(np.mean(np.sqrt(DM_array.opd**2))))
+		_log.debug("Mean RMS wavefront error in mismatched arm, (includes beyond mask):"+str(np.mean(np.sqrt(DM_array.opd**2))))
+		_log.debug("Mean RMS wavefront error in mismatched arm, (only within mask):"    +str(np.mean(np.sqrt((DM_array.opd*self.mask_array)**2))))
+		wavefront_arm *= DM_array
+
+	wavefront_arm.wavefront = sheararray(wavefront_arm.wavefront,self.shear) #sheared
+
+        #interfere the arms, accounting for fractional intensity mismatch between the arms: 
+	if self.display_intermediates:
+		plt.figure()
+		plt.title("Wavefront arm OPD [radians]")
+		plt.imshow(wavefront_arm.phase*self.mask_array)
+		plt.colorbar()
+        wavefront_combined = 0.5*(1.0 + self.intensity_mismatch)*wavefront.wavefront + 0.5*(-1.0 + self.intensity_mismatch)*wavefront_arm.wavefront
+	wavefront_bright.wavefront = 0.5*(1.0 - self.intensity_mismatch)*wavefront.wavefront + 0.5*(1.0 + self.intensity_mismatch)*wavefront_arm.wavefront
+
+        wavefront.wavefront=wavefront_combined
+
+        #plt.imshow(mask_array)
+	if self.display_intermediates:
+		plt.figure()
+		ax=plt.subplot(121)
+		wavefront.display(what='phase',nrows=nrows,row=1, colorbar=True,vmax=wavefront.amplitude.max(),vmin=wavefront.amplitude.min(),ax=ax)
+	wavefront.wavefront=wavefront.wavefront*self.mask_array
+	wavefront_bright.wavefront=wavefront_bright.wavefront*self.mask_array
+
+	#recenter arrays, almost:
+	wavefront.wavefront = sheararray(wavefront.wavefront,-self.shear/2.0)
+	wavefront_bright.wavefront = sheararray(wavefront_bright.wavefront,-self.shear/2.0)
+
+	if  poppy.settings.enable_flux_tests(): _log.debug("Masked Dark output (wavefront),  Flux === "+str(wavefront.totalIntensity))
+	if  poppy.settings.enable_flux_tests(): _log.debug("Masked Bright output, (wavefront_bright),  Flux === "+str(wavefront_bright.totalIntensity))
+
+	if self.display_intermediates:
+		intens = wavefront.intensity.copy()
+		phase  = wavefront.phase.copy()
+		phase[np.where(intens ==0)] = 0.0
+		   
+		_log.debug("Mean RMS wavefront error in combined, masked wavefront:"   +str(wavefront.wavelength*(np.mean(np.sqrt(phase**2)))/(2*np.pi)))
+		plt.figure()
+		ax=plt.subplot(111)
+		wavefront.display(what='other',nrows=2,row=1, colorbar=True,vmax=wavefront.amplitude.max(),vmin=wavefront.amplitude.min())
+		plt.figure()
+		
+		ax2=plt.subplot(111)
+		ax2.imshow(np.log10(phase))#wavefront.wavelength*/(2*np.pi))
+		ax2.set_title("Phase errors, [$log_{10}$(radians)]")
+		plt.colorbar(ax2.images[0])
+		plt.figure()
+		ax3=plt.subplot(111)
+		ax3.set_title("Oversampled Pupil Intensity Map [$log_{10}$(counts)]")
+		ax3.imshow(np.log10(wavefront.intensity))#wavefront.wavelength*/(2*np.pi))
+		plt.colorbar(ax3.images[0])
+		#suptitle.remove() #  does not work due to some matplotlib limitation, so work arount:
+		suptitle.set_text('') # clean up before next iteration to avoid ugly overwriting		
+        wavefront.propagateTo(self.detector)
+        wavefront_bright.propagateTo(self.detector)
+
+	if  poppy.settings.enable_flux_tests(): _log.debug(" Dark output in front of detector (wavefront),  Flux === "+str(wavefront.totalIntensity))
+	if  poppy.settings.enable_flux_tests(): _log.debug(" Bright output in front of detector (wavefront_bright),  Flux === "+str(wavefront_bright.totalIntensity))
+
+        self.wavefront = wavefront#.wavefront #.asFITS()
+        self.wavefront_bright = wavefront_bright#.wavefront #.asFITS()
+	self.nullerstatus=True
+	if poppy.settings.enable_speed_tests():
+		t_stop = time.time()
+		deltat=t_stop-t_start
+		if self.verbose: _log.info(" nulled in %g " % deltat)
+	return (self.wavefront, wavefront_bright)
+
+def downsample_display(input,block=(10,10),
+		       save=False,
+		       filename='DownsampledOut.fits',
+		       vmin=1e-8,vmax=1e1,
+		       ax=False,norm='log',add_noise=False):
+	'''
+	takes a wavefront's intensity, and generates a downsampled fits image for display and saving to disk.
+	'''
+	print(str(type(input)))
+	if str(type(input)) == "<class 'astropy.io.fits.hdu.hdulist.HDUList'>":
+		inFITS=input
+	else:
+		try:
+			inFITS=input.asFITS()
+		except Exception, err:
+			print(err)
+			raise ValueError("Type not recognized as wavefront")
+	if ax==False:
+		plt.figure()
+		ax = plt.subplot(111)
+	
+	cmap = matplotlib.cm.jet
+	halffov_x = inFITS[0].header['PIXELSCL']*inFITS[0].data.shape[1]/2
+	halffov_y = inFITS[0].header['PIXELSCL']*inFITS[0].data.shape[0]/2
+	extent = [-halffov_x, halffov_x, -halffov_y, halffov_y]
+	unit="arcsec"
+	if norm=="log":
+		norm=LogNorm(vmin=vmin,vmax=vmax)
+	else:
+		norm=Normalize(vmin=vmin,vmax=vmax)
+	plt.xlabel(unit)
+	downsampled=downsample(inFITS[0].data,block=block)
+	titlestring=str(inFITS[0].data.shape)+" array, downsampled by:"+str(block)
+	plt.title(titlestring)
+	poppy.utils.imshow_with_mouseover(downsampled,ax=ax, interpolation='none',  extent=extent, norm=norm, cmap=cmap)
+	plt.colorbar(ax.images[0])
+	outFITS = fits.HDUList(fits.PrimaryHDU(data=downsampled,header=inFITS[0].header))
+	newpixelscale=inFITS[0].header['PIXELSCL']*block[0]
+	outFITS[0].header.update('PIXELSCL', newpixelscale, 'Scale in arcsec/pix (after oversampling and subsequent downsampling)')
+	outFITS[0].header.add_history(titlestring)
+	try:
+		outFITS.writeto(filename)
+	except Exception, err:
+		print(err)
+        return outFITS
+
+
+
+
