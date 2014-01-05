@@ -198,11 +198,25 @@ class NullingCoronagraph(poppy.OpticalSystem):
 	wavefront_arm.wavefront = sheararray(wavefront_arm.wavefront,self.shear) #sheared
 
         #interfere the arms, accounting for fractional intensity mismatch between the arms: 
-	'''	if self.display_intermediates:
+	if self.display_intermediates:
 		plt.figure()
+		plt.subplot(221)
 		plt.title("Wavefront arm OPD [radians]")
-		plt.imshow(wavefront_arm.phase*self.mask_array)
-		plt.colorbar()'''
+
+		plt.imshow(wavefront_arm.phase)#*wavefront.wavelength/(2.0*np.pi))
+		plt.colorbar()
+
+		plt.subplot(222)
+
+		plt.imshow(wavefront_arm.phase*self.mask_array)#*wavefront.wavelength/(2.0*np.pi))
+		plt.colorbar()
+
+		plt.figure()
+		displaywavefrontarm=wavefront_arm.copy()
+		displaywavefrontarm.wavefront=displaywavefrontarm.wavefront*self.mask_array
+		displaywavefrontarm.wavefront=sheararray(displaywavefrontarm.wavefront,-self.shear/2.0)
+		displaywavefrontarm.display(what='other',nrows=2,row=1, colorbar=True,vmax=wavefront_arm.amplitude.max(),vmin=wavefront_arm.amplitude.min())
+		
         wavefront_combined = 0.5*(1.0 + self.intensity_mismatch)*wavefront.wavefront + 0.5*(-1.0 + self.intensity_mismatch)*wavefront_arm.wavefront
 	wavefront_bright.wavefront = 0.5*(1.0 - self.intensity_mismatch)*wavefront.wavefront + 0.5*(1.0 + self.intensity_mismatch)*wavefront_arm.wavefront
 
@@ -222,6 +236,7 @@ class NullingCoronagraph(poppy.OpticalSystem):
 
 	if  poppy.settings.enable_flux_tests(): _log.debug("Masked Dark output (wavefront),  Flux === "+str(wavefront.totalIntensity))
 	if  poppy.settings.enable_flux_tests(): _log.debug("Masked Bright output, (wavefront_bright),  Flux === "+str(wavefront_bright.totalIntensity))
+	'''
 
 	if self.display_intermediates:
 		intens = wavefront.intensity.copy()
@@ -233,7 +248,6 @@ class NullingCoronagraph(poppy.OpticalSystem):
 		ax=plt.subplot(111)
 		wavefront.display(what='other',nrows=2,row=1, colorbar=True,vmax=wavefront.amplitude.max(),vmin=wavefront.amplitude.min())
 		plt.figure()
-		'''
 		ax2=plt.subplot(111)
 		ax2.imshow(np.log10(phase))#wavefront.wavelength*/(2*np.pi))
 		ax2.set_title("Phase errors, [$log_{10}$(radians)]")
