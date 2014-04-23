@@ -57,66 +57,66 @@ class NullingCoronagraph(poppy.OpticalSystem):
                 input pupil obscuration, i.e. secondary, uses phase_mismatch_meters_pixel scaling, defaults to False.
     verbose:
         Default is True,
-   defocus: ThinLens(AnalyticOpticalElement) or False
+    defocus: ThinLens(AnalyticOpticalElement) or False
         defocusing term to apply to the interferred pupil.
     """
 
     def __init__(self, ExistingOpticalSystem,
-		 oversample=8,
-		 wavelength=0.633e-6,
-                 normalize='last',
-		 save_intermediates=False, display_intermediates=True,
-		 shear=0.3,
-		 nrows=6,
-		 intensity_mismatch=0.000,
-		 phase_mismatch_fits=False,
-		 phase_mismatch_meters_pixel=0, phase_flat_fits=False,
-		 obscuration_fname=False,
-		 pupilmask=False,verbose=True,defocus=False):
-
+        oversample=False,
+        wavelength=0.633e-6,
+        normalize='last',
+        save_intermediates=False, display_intermediates=True,
+        shear=0.3,
+        nrows=6,
+        intensity_mismatch=0.000,
+        phase_mismatch_fits=False,
+        phase_mismatch_meters_pixel=0, phase_flat_fits=False,
+        obscuration_fname=False,
+        pupilmask=False,verbose=True,defocus=False,store_pupil=False):
         self.phase_mismatch_fits=phase_mismatch_fits
-	self.pupilmask=pupilmask
-	self.normalize=normalize
+        self.pupilmask=pupilmask
+        self.normalize=normalize
         self.name = "SemiAnalyticCoronagraph for "+ExistingOpticalSystem.name
         self.verbose =verbose
         self.source_offset_r = ExistingOpticalSystem.source_offset_r
         self.source_offset_theta = ExistingOpticalSystem.source_offset_theta
         self.planes = ExistingOpticalSystem.planes
         self.intensity_mismatch=intensity_mismatch
-	self.wavelength=wavelength
-	self.save_intermediates=save_intermediates
-	self.display_intermediates=display_intermediates
-	self.phase_mismatch_meters_pixel=phase_mismatch_meters_pixel
-	self.shear=shear
-	self.defocus=defocus
-	self.nullerstatus=False
-	self.phase_flat_fits=phase_flat_fits
-	self._default_display_size= 20.
-	self.obscuration_fname=obscuration_fname
+        self.wavelength=wavelength
+        self.save_intermediates=save_intermediates
+        self.display_intermediates=display_intermediates
+        self.phase_mismatch_meters_pixel=phase_mismatch_meters_pixel
+        self.shear=shear
+        self.defocus=defocus
+        self.nullerstatus=False
+        self.phase_flat_fits=phase_flat_fits
+        self._default_display_size= 20.
+        self.obscuration_fname=obscuration_fname
         try:
-		self.inputpupil = self.planes[0]
-		# self.occulter = self.planes[1]
-		#self.lyotplane = self.planes[2]
-		self.detector = self.planes[-1]
+            self.inputpupil = self.planes[0]
+            # self.occulter = self.planes[1]
+            #self.lyotplane = self.planes[2]
+            self.detector = self.planes[-1]
         except Exception,err:
-		print(err)
+            print(err)
         self.oversample = oversample
-	
+        self.store_pupil=store_pupil
+
     def null(self,wavelength=0.633e-6,wave_weight=1,flux=1.0,offset_x=0.0,offset_y=0.0):
-	'''
-	nulls the Nulling Coronagraph according to the optical system prescription.
-	After null runs, the nullstatus is set to True.
-	Returns: a tuple of the dark and bright outputs: (self.wavefront, wavefront_bright).
-	Flux should be counts/second.
-	'''
-	if poppy.settings.enable_speed_tests():
-		t_start = time.time()
+        '''
+        nulls the Nulling Coronagraph according to the optical system prescription.
+        After null runs, the nullstatus is set to True.
+        Returns: a tuple of the dark and bright outputs: (self.wavefront, wavefront_bright).
+        Flux should be counts/second.
+        '''
+        if poppy.settings.enable_speed_tests():
+            t_start = time.time()
 
-	wavefront = self.inputWavefront(wavelength)
+        wavefront = self.inputWavefront(wavelength)
 
-	if  poppy.settings.enable_flux_tests(): _log.debug("Wavefront initialized,  Flux === "+str(wavefront.totalIntensity))
+        if  poppy.settings.enable_flux_tests(): _log.debug("Wavefront initialized,  Flux === "+str(wavefront.totalIntensity))
 
-	print(wavefront.wavefront.real.max())
+        print(wavefront.wavefront.real.max())
 
         if self.save_intermediates:
             raise NotImplemented("not yet")
@@ -126,122 +126,121 @@ class NullingCoronagraph(poppy.OpticalSystem):
             nrows = 6
             #plt.clf()
             #wavefront.display(what='intensity',nrows=nrows,row=1, colorbar=False)
-        wavefront *= self.inputpupil
-	if self.defocus:
-		wavefront *= self.defocus
-	wavefront.normalize()
-	wavefront *= np.sqrt(flux)
-	_log.debug("Normalized all planes, after the unobscured aperture, then multiplied by incident flux %s",str(flux))
-	if  poppy.settings.enable_flux_tests(): _log.debug("Wavefront multiplied by flux,  Flux === "+str(wavefront.totalIntensity))
-	if self.obscuration_fname:
-		self.obscuration=poppy.FITSOpticalElement(transmission=self.obscuration_fname,
-						  pixelscale=self.phase_mismatch_meters_pixel,
-						  oversample=False,opdunits='meters')
-		#only apply obscuration if there is not going to be a pupil plane mask later.
-		if not self.pupilmask:
-			wavefront *= self.obscuration
-			wavefront_ideal *=  self.obscuration
-			
-	wavefront_ideal = wavefront.copy()
+            wavefront *= self.inputpupil
+        if self.defocus:
+            wavefront *= self.defocus
+        wavefront.normalize()
+        wavefront *= np.sqrt(flux)
+        _log.debug("Normalized all planes, after the unobscured aperture, then multiplied by incident flux %s",str(flux))
+        if  poppy.settings.enable_flux_tests(): _log.debug("Wavefront multiplied by flux,  Flux === "+str(wavefront.totalIntensity))
+        if self.obscuration_fname:
+            self.obscuration=poppy.FITSOpticalElement(transmission=self.obscuration_fname,
+                              pixelscale=self.phase_mismatch_meters_pixel,
+                              oversample=self.oversample,opdunits='meters')
+            #only apply obscuration if there is not going to be a pupil plane mask later.
+            if not self.pupilmask:
+                wavefront *= self.obscuration
+                wavefront_ideal *=  self.obscuration
+
+        wavefront_ideal = wavefront.copy()
         wavefront_ideal.wavefront=np.ones(wavefront.shape)
         wavefront_ideal *=  self.inputpupil
-	
 
+        if (offset_x!=0) or (offset_y !=0):
+            wavefront.tilt(Xangle=offset_x, Yangle=offset_y)
+            _log.debug("Tilted wavefront by theta_X=%f, theta_Y=%f arcsec, for target with flux of %f" % (offset_x, offset_y,flux))
+        else:
+            _log.debug("No Tilt. Target with flux of %f" % (flux))
 
-	if (offset_x!=0) or (offset_y !=0):
-		wavefront.tilt(Xangle=offset_x, Yangle=offset_y)
-		_log.debug("Tilted wavefront by theta_X=%f, theta_Y=%f arcsec, for target with flux of %f" % (offset_x, offset_y,flux))
-	else:
-		_log.debug("No Tilt. Target with flux of %f" % (flux))
- 			   
         def sheararray(inputwavefront,shear):
-		sheared = np.roll(inputwavefront,int(round(inputwavefront.shape[0]*shear)))
-		return sheared
+            sheared = np.roll(inputwavefront,int(round(inputwavefront.shape[0]*shear)))
+            return sheared
 
         wavefront_arm = wavefront.copy()
         wavefront_bright= wavefront.copy()
-	
-	if not self.pupilmask:
-		mask= wavefront_ideal.wavefront + sheararray(wavefront_ideal.wavefront,self.shear)
-		mask_array=np.zeros(wavefront.shape)
-		mask_array[np.where(mask  >1.1 )]=1.0
-		mask_array[np.where(mask < 1)]=0
-		#force area wrapped back over the leading edge to zero:
-		mask_array[:,0:int(round(wavefront.wavefront.shape[0]*self.shear))]=0
-		self.mask_array = mask_array
+        if not self.pupilmask:
+            mask= wavefront_ideal.wavefront + sheararray(wavefront_ideal.wavefront,self.shear)
+            mask_array=np.zeros(wavefront.shape)
+            mask_array[np.where(mask  >1.1 )]=1.0
+            mask_array[np.where(mask < 1)]=0
+            #force area wrapped back over the leading edge to zero:
+            mask_array[:,0:int(round(wavefront.wavefront.shape[0]*self.shear))]=0
+            self.mask_array = mask_array
 
         else:
-		self.FITSmask=poppy.FITSOpticalElement(transmission=self.pupilmask,planetype=_PUPIL,rotation=-45,oversample=False)     
-		print(self.FITSmask.pixelscale)
-		#offset mask onto the sheared array
-		self.mask_array = np.roll(self.FITSmask.amplitude,int(round(self.FITSmask.amplitude.shape[0]*self.shear)/2.0))
-	
-        #calculate the effect of phase differences between the arms:
+            self.FITSmask=poppy.FITSOpticalElement(transmission=self.pupilmask,planetype=_PUPIL,rotation=-45,oversample=self.oversample)     
+            print(self.FITSmask.pixelscale)
+            #offset mask onto the sheared array
+            self.mask_array = np.roll(self.FITSmask.amplitude,int(round(self.FITSmask.amplitude.shape[0]*self.shear)/2.0))
+
+            #calculate the effect of phase differences between the arms:
         if self.phase_mismatch_fits:
-		#this also filters out the dead actuators.
-		#let the dead actuators through: not implimented.
-		#DM pupil.
-		DM_array=poppy.FITSOpticalElement(opd=self.phase_mismatch_fits,pixelscale=self.phase_mismatch_meters_pixel,oversample=False,opdunits='meters',rotation=225)
-		#a low passed version to subtract, simulating flattening the DM:
-		if self.phase_flat_fits:
-			# DM pupil:
-			DM_flat=poppy.FITSOpticalElement(opd=self.phase_flat_fits,pixelscale=self.phase_mismatch_meters_pixel,oversample=False,opdunits='meters',rotation=225)
-			DM_array.opd=DM_array.opd-DM_flat.opd
-			#center DM on mask:
-			DM_array.opd= sheararray(DM_array.opd,-self.shear/2.0)
-		DM_array.opd=DM_array.opd
-		_log.debug("RMS wavefront error in mismatched arm, (includes beyond mask):"+str(np.mean(np.sqrt(DM_array.opd**2))))
-		_log.debug("Mean RMS wavefront error in mismatched arm, (includes beyond mask):"+str(np.mean(np.sqrt(DM_array.opd**2))))
-		_log.debug("Mean RMS wavefront error in mismatched arm, (only within mask):"    +str(np.mean(np.sqrt((DM_array.opd*self.mask_array)**2))))
-		wavefront_arm *= DM_array
+            #this also filters out the dead actuators.
+            #let the dead actuators through: not implimented.
+            #DM pupil.
+            DM_array=poppy.FITSOpticalElement(opd=self.phase_mismatch_fits,pixelscale=self.phase_mismatch_meters_pixel,oversample=self.oversample,opdunits='meters',rotation=225)
+            #a low passed version to subtract, simulating flattening the DM:
+        if self.phase_flat_fits:
+            # DM pupil:
+            DM_flat=poppy.FITSOpticalElement(opd=self.phase_flat_fits,pixelscale=self.phase_mismatch_meters_pixel,oversample=self.oversample,opdunits='meters',rotation=225)
+            DM_array.opd=DM_array.opd-DM_flat.opd
+            #center DM on mask:
+            DM_array.opd= sheararray(DM_array.opd,-self.shear/2.0)
 
-	wavefront_arm.wavefront = sheararray(wavefront_arm.wavefront,self.shear) #sheared
+            #    DM_array.opd=DM_array.opd
+        _log.debug("RMS wavefront error in mismatched arm, (includes beyond mask):"+str(np.mean(np.sqrt(DM_array.opd**2))))
+        _log.debug("Mean RMS wavefront error in mismatched arm, (includes beyond mask):"+str(np.mean(np.sqrt(DM_array.opd**2))))
+        _log.debug("Mean RMS wavefront error in mismatched arm, (only within mask):"    +str(np.mean(np.sqrt((DM_array.opd*self.mask_array)**2))))
+        wavefront_arm *= DM_array
 
+        wavefront_arm.wavefront = sheararray(wavefront_arm.wavefront,self.shear) #sheared
         #interfere the arms, accounting for fractional intensity mismatch between the arms: 
-	if self.display_intermediates:
-		plt.figure()
-		plt.subplot(221)
-		plt.title("Wavefront arm OPD [radians]")
+        if self.display_intermediates:
+            plt.figure()
+            plt.subplot(221)
+            plt.title("Wavefront arm OPD [radians]")
+            plt.imshow(wavefront_arm.phase)#*wavefront.wavelength/(2.0*np.pi))
+            plt.colorbar()
+            plt.subplot(222)
+            plt.imshow(wavefront_arm.phase*self.mask_array)#*wavefront.wavelength/(2.0*np.pi))
+            plt.colorbar()
+            plt.figure()
+            displaywavefrontarm=wavefront_arm.copy()
+            displaywavefrontarm.wavefront=displaywavefrontarm.wavefront*self.mask_array
+            displaywavefrontarm.wavefront=sheararray(displaywavefrontarm.wavefront,-self.shear/2.0)
+            displaywavefrontarm.display(what='other',nrows=2,row=1, colorbar=True,vmax=wavefront_arm.amplitude.max(),vmin=wavefront_arm.amplitude.min())
 
-		plt.imshow(wavefront_arm.phase)#*wavefront.wavelength/(2.0*np.pi))
-		plt.colorbar()
 
-		plt.subplot(222)
-
-		plt.imshow(wavefront_arm.phase*self.mask_array)#*wavefront.wavelength/(2.0*np.pi))
-		plt.colorbar()
-
-		plt.figure()
-		displaywavefrontarm=wavefront_arm.copy()
-		displaywavefrontarm.wavefront=displaywavefrontarm.wavefront*self.mask_array
-		displaywavefrontarm.wavefront=sheararray(displaywavefrontarm.wavefront,-self.shear/2.0)
-		displaywavefrontarm.display(what='other',nrows=2,row=1, colorbar=True,vmax=wavefront_arm.amplitude.max(),vmin=wavefront_arm.amplitude.min())
-		
         wavefront_combined = 0.5*(1.0 + self.intensity_mismatch)*wavefront.wavefront + 0.5*(-1.0 + self.intensity_mismatch)*wavefront_arm.wavefront
-	wavefront_bright.wavefront = 0.5*(1.0 - self.intensity_mismatch)*wavefront.wavefront + 0.5*(1.0 + self.intensity_mismatch)*wavefront_arm.wavefront
+        wavefront_bright.wavefront = 0.5*(1.0 - self.intensity_mismatch)*wavefront.wavefront + 0.5*(1.0 + self.intensity_mismatch)*wavefront_arm.wavefront
 
         wavefront.wavefront=wavefront_combined
 
         #plt.imshow(mask_array)
-	if self.display_intermediates:
-		plt.figure()
-		ax=plt.subplot(121)
-		wavefront.display(what='phase',nrows=nrows,row=1, colorbar=True,vmax=wavefront.amplitude.max(),vmin=wavefront.amplitude.min(),ax=ax)
-	wavefront.wavefront=wavefront.wavefront*self.mask_array
-	wavefront_bright.wavefront=wavefront_bright.wavefront*self.mask_array
+        if self.display_intermediates:
+            plt.figure()
+            ax=plt.subplot(121)
+            wavefront.display(what='phase',nrows=nrows,row=1, colorbar=True,vmax=wavefront.amplitude.max(),vmin=wavefront.amplitude.min(),ax=ax)
 
-	#recenter arrays, almost:
-	wavefront.wavefront = sheararray(wavefront.wavefront,-self.shear/2.0)
-	wavefront_bright.wavefront = sheararray(wavefront_bright.wavefront,-self.shear/2.0)
 
-	if  poppy.settings.enable_flux_tests(): _log.debug("Masked Dark output (wavefront),  Flux === "+str(wavefront.totalIntensity))
-	if  poppy.settings.enable_flux_tests(): _log.debug("Masked Bright output, (wavefront_bright),  Flux === "+str(wavefront_bright.totalIntensity))
-	'''
+        wavefront.wavefront=wavefront.wavefront*self.mask_array
+        wavefront_bright.wavefront=wavefront_bright.wavefront*self.mask_array
+        #recenter arrays, almost:
+        wavefront.wavefront = sheararray(wavefront.wavefront,-self.shear/2.0)
 
+        wavefront_bright.wavefront = sheararray(wavefront_bright.wavefront,-self.shear/2.0)
+
+        if  poppy.settings.enable_flux_tests(): _log.debug("Masked Dark output (wavefront),  Flux === "+str(wavefront.totalIntensity))
+        if  poppy.settings.enable_flux_tests(): _log.debug("Masked Bright output, (wavefront_bright),  Flux === "+str(wavefront_bright.totalIntensity))
+
+        if self.store_pupil:  
+            self.pupil_plane_dark=wavefront.wavefront.copy()     
+            self.pupil_dm_arm=wavefront_arm.wavefront
+        '''
 	if self.display_intermediates:
 		intens = wavefront.intensity.copy()
 		phase  = wavefront.phase.copy()
-		phase[np.where(intens ==0)] = 0.0
+        phase[np.where(intens ==0)] = 0.0
 		   
 		_log.debug("Mean RMS wavefront error in combined, masked wavefront:"   +str(wavefront.wavelength*(np.mean(np.sqrt(phase**2)))/(2*np.pi)))
 		plt.figure()
@@ -258,21 +257,24 @@ class NullingCoronagraph(poppy.OpticalSystem):
 		ax3.imshow(np.log10(wavefront.intensity))#wavefront.wavelength*/(2*np.pi))
 		plt.colorbar(ax3.images[0])
 		#suptitle.remove() #  does not work due to some matplotlib limitation, so work arount:
-		suptitle.set_text('') # clean up before next iteration to avoid ugly overwriting	'''	
+		suptitle.set_text('') # clean up before next iteration to avoid ugly overwriting
+        '''
         wavefront.propagateTo(self.detector)
         wavefront_bright.propagateTo(self.detector)
-
-	if  poppy.settings.enable_flux_tests(): _log.debug(" Dark output in front of detector (wavefront),  Flux === "+str(wavefront.totalIntensity))
-	if  poppy.settings.enable_flux_tests(): _log.debug(" Bright output in front of detector (wavefront_bright),  Flux === "+str(wavefront_bright.totalIntensity))
-
+        if poppy.settings.enable_flux_tests():
+             _log.debug(" Dark output in front of detector (wavefront),  Flux === "+str(wavefront.totalIntensity))
+             _log.debug(" Bright output in front of detector (wavefront_bright),  Flux === "+str(wavefront_bright.totalIntensity))
         self.wavefront = wavefront#.wavefront #.asFITS()
         self.wavefront_bright = wavefront_bright#.wavefront #.asFITS()
-	self.nullerstatus=True
-	if poppy.settings.enable_speed_tests():
-		t_stop = time.time()
-		deltat=t_stop-t_start
-		if self.verbose: _log.info(" nulled in %g " % deltat)
-	return (self.wavefront, wavefront_bright)
+        self.nullerstatus=True
+        if poppy.settings.enable_speed_tests():
+            t_stop = time.time()
+            deltat=t_stop-t_start
+            if self.verbose: _log.info(" nulled in %g " % deltat)
+        return(self.wavefront, wavefront_bright)
+    # self.pupil_plane_dark =	wavefront.copy()
+
+
 
 def downsample_display(input,block=(10,10),
 		       save=False,
