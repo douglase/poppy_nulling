@@ -1,4 +1,4 @@
-import nullwithpoppy
+import null
 import os,time
 import numpy as np
 import poppy #initially setup with 0.2.8
@@ -12,6 +12,8 @@ _log = logging.getLogger('poppy')
 import astropy.io.fits as fits
 from mpl_toolkits.axes_grid1.inset_locator import zoomed_inset_axes
 from mpl_toolkits.axes_grid1.inset_locator import mark_inset
+from matplotlib.colors import LogNorm, Normalize  # for log scaling of images, with automatic colorbar support
+from numpy.lib.stride_tricks import as_strided as ast
 
 
 def nullwave(newnuller,wavelength,weight,tiltlist,star_counts,returnBright):
@@ -324,3 +326,48 @@ def find_annular_profiles(HDUlist_or_filename=None,
         return (rr, radialprofile2, EE) 
 
 
+def downsample_display(input,block=(10,10),
+		       save=False,
+		       filename='DownsampledOut.fits',
+		       vmin=1e-8,vmax=1e1,
+		       ax=False,norm='log',add_noise=False):
+	'''
+	takes a wavefront's intensity, and generates a downsampled fits image for display and saving to disk.
+	'''
+	print(str(type(input)))
+	if str(type(input)) == "<class 'astropy.io.fits.hdu.hdulist.HDUList'>":
+		inFITS=input
+	else:
+		try:
+			inFITS=input.asFITS()
+		except Exception, err:
+			print(err)
+			raise ValueError("Type not recognized as wavefront")
+	if ax==False:
+		plt.figure()
+		ax = plt.subplot(111)
+	
+	cmap = matplotlib.cm.jet
+	halffov_x = inFITS[0].header['PIXELSCL']*inFITS[0].data.shape[1]/2
+	halffov_y = inFITS[0].header['PIXELSCL']*inFITS[0].data.shape[0]/2
+	extent = [-halffov_x, halffov_x, -halffov_y, halffov_y]
+	unit="arcsec"
+	if norm=="log":
+		norm=LogNorm(vmin=vmin,vmax=vmax)
+	else:
+		norm=Normalize(vmin=vmin,vmax=vmax)
+	plt.xlabel(unit)
+	downsampled=downsample(inFITS[0].data,block=block)
+	titlestring=str(inFITS[0].data.shape)+" array, downsampled by:"+str(block)
+	plt.title(titlestring)
+	poppy.utils.imshow_with_mouseover(downsampled,ax=ax, interpolation='none',  extent=extent, norm=norm, cmap=cmap)
+	plt.colorbar(ax.images[0])
+	outFITS = fits.HDUList(fits.PrimaryHDU(data=downsampled,header=inFITS[0].header))
+	newpixelscale=inFITS[0].header['PIXELSCL']*block[0]
+	outFITS[0].header.update('PIXELSCL', newpixelscale, 'Scale in arcsec/pix (after oversampling and subsequent downsampling)')
+	outFITS[0].header.add_history(titlestring)
+	try:
+		outFITS.writeto(filename)
+	except Exception, err:
+		print(err)
+        return outFITS

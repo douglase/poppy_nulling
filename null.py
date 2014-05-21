@@ -9,7 +9,7 @@ import astropy
 import time
 
 _log = logging.getLogger('poppy')
-
+print("logging")
 # internal constants for types of plane
 _PUPIL = 1
 _IMAGE = 2
