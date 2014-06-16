@@ -102,7 +102,7 @@ class NullingCoronagraph(poppy.OpticalSystem):
         self.oversample = oversample
         self.store_pupil=store_pupil
 
-    def null(self,wavelength=0.633e-6,wave_weight=1,flux=1.0,offset_x=0.0,offset_y=0.0):
+    def null(self,wavelength=0.633e-6,wave_weight=1,flux=1.0,offset_x=0.0,offset_y=0.0,prebuilt_wavefront=False):
         '''
         nulls the Nulling Coronagraph according to the optical system prescription.
         After null runs, the nullstatus is set to True.
@@ -111,8 +111,13 @@ class NullingCoronagraph(poppy.OpticalSystem):
         '''
         if poppy.settings.enable_speed_tests():
             t_start = time.time()
-
-        wavefront = self.inputWavefront(wavelength)
+        if prebuilt_wavefront:
+            if prebuilt_wavefront.__class__ ==poppy.poppy_core.Wavefront:
+                wavefront=prebuilt_wavefront
+            else:
+                raise ValueError("prebuilt_wavefront is not a wavefront class.")
+        else:
+            wavefront = self.inputWavefront(wavelength)
 
         if  poppy.settings.enable_flux_tests(): _log.debug("Wavefront initialized,  Flux === "+str(wavefront.totalIntensity))
 
@@ -158,6 +163,7 @@ class NullingCoronagraph(poppy.OpticalSystem):
 
         wavefront_arm = wavefront.copy()
         wavefront_bright= wavefront.copy()
+
         if not self.pupilmask:
             mask= wavefront_ideal.wavefront + sheararray(wavefront_ideal.wavefront,self.shear)
             mask_array=np.zeros(wavefront.shape)
@@ -188,11 +194,14 @@ class NullingCoronagraph(poppy.OpticalSystem):
             DM_array.opd= sheararray(DM_array.opd,-self.shear/2.0)
 
             #    DM_array.opd=DM_array.opd
-        _log.debug("RMS wavefront error in mismatched arm, (includes beyond mask):"+str(np.mean(np.sqrt(DM_array.opd**2))))
-        _log.debug("Mean RMS wavefront error in mismatched arm, (includes beyond mask):"+str(np.mean(np.sqrt(DM_array.opd**2))))
-        _log.debug("Mean RMS wavefront error in mismatched arm, (only within mask):"    +str(np.mean(np.sqrt((DM_array.opd*self.mask_array)**2))))
-        wavefront_arm *= DM_array
-
+        try:
+            _log.debug("RMS wavefront error in mismatched arm, (includes beyond mask):"+str(np.mean(np.sqrt(DM_array.opd**2))))
+            _log.debug("Mean RMS wavefront error in mismatched arm, (includes beyond mask):"+str(np.mean(np.sqrt(DM_array.opd**2))))
+            _log.debug("Mean RMS wavefront error in mismatched arm, (only within mask):"    +str(np.mean(np.sqrt((DM_array.opd*self.mask_array)**2))))
+            wavefront_arm *= DM_array
+        except Exception, err:
+            print(err)
+            print("is DM_array defined?")
         wavefront_arm.wavefront = sheararray(wavefront_arm.wavefront,self.shear) #sheared
         #interfere the arms, accounting for fractional intensity mismatch between the arms: 
         if self.display_intermediates:
