@@ -371,3 +371,42 @@ def downsample_display(input,block=(10,10),
 	except Exception, err:
 		print(err)
         return outFITS
+
+def InputWavefrontFromField(inwave,field,arcsec_per_pixel,zero_init_wavefront=True):
+    '''Treats each pixel in the inwave array as a source
+    calculate the angle and offset of
+    that source and add to output wavefront.
+    
+    For fields where every point in the field is coherent.
+    '''
+    centerx=int(np.round(np.shape(field)[0]/2.0))
+    centery=int(np.round(np.shape(field)[1]/2.0))
+    print(centerx,centery)
+    #centery=(np.shape(field))[1]/2.0
+    npix=field.shape[0]
+    #npix = self.planes[0].shape[0] if self.planes[0].shape is not None else 1024
+    # $iam = self.planes[0].pupil_diam if hasattr(self.planes[0], 'pupil_diam') else 8
+    pixwavefront_init=inwave.copy()
+
+    if zero_init_wavefront:
+        inwave *= 0
+        #inwave = poppy.Wavefront(wavelength=0.633e-6,npix = npix,diam = .5 ,oversample=4)
+        #_log.debug("Creating input wavefront with wavelength=%f, npix=%d, pixel scale=%f meters/pixel" % (wavelength, npix, diam/npix))
+    else:
+        inwave.normalize() #check that this is expected value.
+    for i in range(np.shape(field)[0]):
+        for j in range(np.shape(field)[1]):
+            flux=field[i,j]/np.sum(field)
+            if flux > 0:
+                #print(i,j)
+                pixwavefront=pixwavefront_init.copy()
+                pixwavefront *= flux
+                r_pixel=arcsec_per_pixel*np.sqrt((i-centerx)**2+(j-centerx)**2) #arcsec
+                angle=np.angle(complex((j-centery),(i-centerx))) #radians.
+                offset_x = r_pixel *-np.sin(angle)  # convert to offset X,Y in arcsec
+                offset_y = r_pixel * np.cos(angle)  # using the usual astronomical angle convention
+                pixwavefront.tilt(Xangle=offset_x, Yangle=offset_y)
+                tilt_msg="Tilted wavefront by theta_X=%f, theta_Y=%f arcsec, for target with relative flux of %f" % (offset_x, offset_y,flux)
+                _log.debug(tilt_msg)
+                inwave +=pixwavefront
+    return inwave

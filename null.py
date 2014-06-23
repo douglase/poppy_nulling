@@ -8,8 +8,11 @@ import numpy as np
 import astropy
 import time
 
-_log = logging.getLogger('poppy')
+_log = logging.getLogger('poppy-null')
 print("logging")
+_log.setLevel(logging.DEBUG)
+_log.debug("logging")
+
 # internal constants for types of plane
 _PUPIL = 1
 _IMAGE = 2
@@ -113,9 +116,10 @@ class NullingCoronagraph(poppy.OpticalSystem):
             t_start = time.time()
         if prebuilt_wavefront:
             if prebuilt_wavefront.__class__ ==poppy.poppy_core.Wavefront:
-                wavefront=prebuilt_wavefront
+                wavefront=prebuilt_wavefront.copy()
+                _log.debug("copying a prebuilt input wavefront")
             else:
-                raise ValueError("prebuilt_wavefront is not a wavefront class.")
+                raise _log.error("prebuilt_wavefront is not a wavefront class.")
         else:
             wavefront = self.inputWavefront(wavelength)
 
@@ -200,8 +204,8 @@ class NullingCoronagraph(poppy.OpticalSystem):
             _log.debug("Mean RMS wavefront error in mismatched arm, (only within mask):"    +str(np.mean(np.sqrt((DM_array.opd*self.mask_array)**2))))
             wavefront_arm *= DM_array
         except Exception, err:
-            print(err)
-            print("is DM_array defined?")
+            _log.warn(err)
+            _log.warn("is DM_array defined?")
         wavefront_arm.wavefront = sheararray(wavefront_arm.wavefront,self.shear) #sheared
         #interfere the arms, accounting for fractional intensity mismatch between the arms: 
         if self.display_intermediates:
