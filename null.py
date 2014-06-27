@@ -115,19 +115,17 @@ class NullingCoronagraph(poppy.OpticalSystem):
         if poppy.settings.enable_speed_tests():
             t_start = time.time()
         if prebuilt_wavefront:
-            print(prebuilt_wavefront.__class__)
             if prebuilt_wavefront.__class__ ==poppy.poppy_core.Wavefront:
                 wavefront=prebuilt_wavefront.copy()
-                print("copying a prebuilt input wavefront:")
-                wavefront.display(what='other',nrows=6,row=1, colorbar=True)
+                raise _log.debug("copying a prebuilt input wavefront:")
+                if display_intermediates:
+                    wavefront.display(what='other',nrows=6,row=1, colorbar=True)
             else:
                 raise _log.error("prebuilt_wavefront is not a wavefront class.")
         else:
             wavefront = self.inputWavefront(wavelength)
 
         if  poppy.settings.enable_flux_tests(): _log.debug("Wavefront initialized,  Flux === "+str(wavefront.totalIntensity))
-
-        print(wavefront.wavefront.real.max())
 
         if self.save_intermediates:
             raise NotImplemented("not yet")
@@ -181,7 +179,7 @@ class NullingCoronagraph(poppy.OpticalSystem):
 
         else:
             self.FITSmask=poppy.FITSOpticalElement(transmission=self.pupilmask,planetype=_PUPIL,rotation=-45,oversample=self.oversample)     
-            print(self.FITSmask.pixelscale)
+            _log.debug("mask pixel scale:"+str(self.FITSmask.pixelscale))
             #offset mask onto the sheared array
             self.mask_array = np.roll(self.FITSmask.amplitude,int(round(self.FITSmask.amplitude.shape[0]*self.shear)/2.0))
 
@@ -288,55 +286,5 @@ class NullingCoronagraph(poppy.OpticalSystem):
             if self.verbose: _log.info(" nulled in %g " % deltat)
         return(self.wavefront, wavefront_bright)
     # self.pupil_plane_dark =	wavefront.copy()
-
-
-
-def downsample_display(input,block=(10,10),
-		       save=False,
-		       filename='DownsampledOut.fits',
-		       vmin=1e-8,vmax=1e1,
-		       ax=False,norm='log',add_noise=False):
-	'''
-	takes a wavefront's intensity, and generates a downsampled fits image for display and saving to disk.
-	'''
-	print(str(type(input)))
-	if str(type(input)) == "<class 'astropy.io.fits.hdu.hdulist.HDUList'>":
-		inFITS=input
-	else:
-		try:
-			inFITS=input.asFITS()
-		except Exception, err:
-			print(err)
-			raise ValueError("Type not recognized as wavefront")
-	if ax==False:
-		plt.figure()
-		ax = plt.subplot(111)
-	
-	cmap = matplotlib.cm.jet
-	halffov_x = inFITS[0].header['PIXELSCL']*inFITS[0].data.shape[1]/2
-	halffov_y = inFITS[0].header['PIXELSCL']*inFITS[0].data.shape[0]/2
-	extent = [-halffov_x, halffov_x, -halffov_y, halffov_y]
-	unit="arcsec"
-	if norm=="log":
-		norm=LogNorm(vmin=vmin,vmax=vmax)
-	else:
-		norm=Normalize(vmin=vmin,vmax=vmax)
-	plt.xlabel(unit)
-	downsampled=downsample(inFITS[0].data,block=block)
-	titlestring=str(inFITS[0].data.shape)+" array, downsampled by:"+str(block)
-	plt.title(titlestring)
-	poppy.utils.imshow_with_mouseover(downsampled,ax=ax, interpolation='none',  extent=extent, norm=norm, cmap=cmap)
-	plt.colorbar(ax.images[0])
-	outFITS = fits.HDUList(fits.PrimaryHDU(data=downsampled,header=inFITS[0].header))
-	newpixelscale=inFITS[0].header['PIXELSCL']*block[0]
-	outFITS[0].header.update('PIXELSCL', newpixelscale, 'Scale in arcsec/pix (after oversampling and subsequent downsampling)')
-	outFITS[0].header.add_history(titlestring)
-	try:
-		outFITS.writeto(filename)
-	except Exception, err:
-		print(err)
-        return outFITS
-
-
 
 

@@ -375,7 +375,7 @@ def downsample_display(input,block=(10,10),
 		outFITS.writeto(filename)
 	except Exception, err:
 		print(err)
-        return outFITS
+    return outFITS
 
 def InputWavefrontFromField(inwave,field,arcsec_per_pixel,zero_init_wavefront=True):
     '''Treats each pixel in the field array as a source
