@@ -141,8 +141,13 @@ def draw_circle(r,dr,amp,cube=False):
 	return array
 
 def plot_inset(inFITS,x1, x2, y1, y2,zoom=2.5):
-	#http://matplotlib.org/mpl_toolkits/axes_grid/users/overview.html#insetlocator
-	fig, ax = plt.subplots(figsize=[5,5])
+	'''
+    plots the first array of the FITS hdulist inFITS and a zoomed inset of the subregion defined by [x1:x2,y1:y2]
+    using example from:
+    http://matplotlib.org/mpl_toolkits/axes_grid/users/overview.html#insetlocator
+
+    '''
+    fig, ax = plt.subplots(figsize=[5,5])
 	
 	# prepare the demo image
 	Z = inFITS[0].data
@@ -373,36 +378,31 @@ def downsample_display(input,block=(10,10),
         return outFITS
 
 def InputWavefrontFromField(inwave,field,arcsec_per_pixel,zero_init_wavefront=True):
-    '''Treats each pixel in the inwave array as a source
-    calculate the angle and offset of
-    that source and add to output wavefront.
+    '''Treats each pixel in the field array as a source
+    calculate the angle and offset of that source from
+    the center of the central pixel and add a
+     copy of inwave with a value =  field[x,y]/np.sum(field)
     
     For fields where every point in the field is coherent.
+
+    if zero_init_wavefront=True then the the initial wavefront will be set to zero before
+    the field array points are added.
+     
     ''' 
     centerx = np.shape(field)[0]/2.0 - 0.5 #need to subtract 0.5 to be at the center of the central pixel
     centery = np.shape(field)[1]/2.0 - 0.5 
     print(centerx,centery)
-    #centery=(np.shape(field))[1]/2.0
-    #npix=field.shape[0]
-    #npix = self.planes[0].shape[0] if self.planes[0].shape is not None else 1024
-    # $iam = self.planes[0].pupil_diam if hasattr(self.planes[0], 'pupil_diam') else 8
+  
     pixwavefront_init=inwave.copy()
 
     if zero_init_wavefront:
         inwave *= 0
-        #inwave = poppy.Wavefront(wavelength=0.633e-6,npix = npix,diam = .5 ,oversample=4)
-        #_log.debug("Creating input wavefront with wavelength=%f, npix=%d, pixel scale=%f meters/pixel" % (wavelength, npix, diam/npix))
     else:
         inwave.normalize() 
     for i in range(np.shape(field)[0]):
         for j in range(np.shape(field)[1]):
-            
             flux=field[i,j]/np.sum(field)
-            #print(i,j,flux)
-
             if flux > 0:
-                #print(i,j,flux)
-
                 pixwavefront=pixwavefront_init.copy()
                 pixwavefront *= flux
                 r_pixel=arcsec_per_pixel*np.sqrt((i-centerx)**2+(j-centerx)**2) #arcsec
@@ -414,6 +414,7 @@ def InputWavefrontFromField(inwave,field,arcsec_per_pixel,zero_init_wavefront=Tr
                 #print(tilt_msg)
                 _log.debug(tilt_msg)
                 inwave +=pixwavefront
+                
     print(inwave.__class__)        
     inwave.display(what='other',nrows=2,row=1, colorbar=True)
     return inwave
