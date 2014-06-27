@@ -115,9 +115,11 @@ class NullingCoronagraph(poppy.OpticalSystem):
         if poppy.settings.enable_speed_tests():
             t_start = time.time()
         if prebuilt_wavefront:
+            print(prebuilt_wavefront.__class__)
             if prebuilt_wavefront.__class__ ==poppy.poppy_core.Wavefront:
                 wavefront=prebuilt_wavefront.copy()
-                _log.debug("copying a prebuilt input wavefront")
+                print("copying a prebuilt input wavefront:")
+                wavefront.display(what='other',nrows=6,row=1, colorbar=True)
             else:
                 raise _log.error("prebuilt_wavefront is not a wavefront class.")
         else:
