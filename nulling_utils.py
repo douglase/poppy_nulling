@@ -378,9 +378,9 @@ def InputWavefrontFromField(inwave,field,arcsec_per_pixel,zero_init_wavefront=Tr
     that source and add to output wavefront.
     
     For fields where every point in the field is coherent.
-    '''
-    centerx=np.shape(field)[0]/2.0
-    centery=np.shape(field)[1]/2.0
+    ''' 
+    centerx = np.shape(field)[0]/2.0 - 0.5 #need to subtract 0.5 to be at the center of the central pixel
+    centery = np.shape(field)[1]/2.0 - 0.5 
     print(centerx,centery)
     #centery=(np.shape(field))[1]/2.0
     #npix=field.shape[0]
@@ -396,17 +396,22 @@ def InputWavefrontFromField(inwave,field,arcsec_per_pixel,zero_init_wavefront=Tr
         inwave.normalize() 
     for i in range(np.shape(field)[0]):
         for j in range(np.shape(field)[1]):
+            
             flux=field[i,j]/np.sum(field)
+            #print(i,j,flux)
+
             if flux > 0:
-                #print(i,j)
+                #print(i,j,flux)
+
                 pixwavefront=pixwavefront_init.copy()
                 pixwavefront *= flux
                 r_pixel=arcsec_per_pixel*np.sqrt((i-centerx)**2+(j-centerx)**2) #arcsec
                 angle=np.angle(complex((j-centery),(i-centerx))) #radians.
-                offset_x = r_pixel *-np.sin(angle)  # convert to offset X,Y in arcsec
+                offset_x = r_pixel * - np.sin(angle)  # convert to offset X,Y in arcsec
                 offset_y = r_pixel * np.cos(angle)  # using the usual astronomical angle convention
                 pixwavefront.tilt(Xangle=offset_x, Yangle=offset_y)
                 tilt_msg="Tilted wavefront by theta_X=%f, theta_Y=%f arcsec, for target with relative flux of %f" % (offset_x, offset_y,flux)
+                #print(tilt_msg)
                 _log.debug(tilt_msg)
                 inwave +=pixwavefront
     print(inwave.__class__)        
