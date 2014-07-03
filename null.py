@@ -190,8 +190,13 @@ class NullingCoronagraph(poppy.OpticalSystem):
             #this also filters out the dead actuators.
             #let the dead actuators through: not implimented.
             #DM pupil.
-            DM_array=poppy.FITSOpticalElement(opd=self.phase_mismatch_fits,pixelscale=self.phase_mismatch_meters_pixel,oversample=self.oversample,opdunits='meters',rotation=225)
-            #a low passed version to subtract, simulating flattening the DM:
+            if type(self.phase_mismatch_fits)==astropy.io.fits.hdu.hdulist.HDUList:
+                DM_array=poppy.FITSOpticalElement(opd=self.phase_mismatch_fits,pixelscale=self.phase_mismatch_meters_pixel,oversample=self.oversample,opdunits='meters',rotation=225)
+            else:
+                _log.warn("phase mismatch is not a FITS HDUList, trying to use it as if it's a FITSOpticalElement.")
+                DM_array=self.phase_mismatch_fits
+
+        #a low passed version to subtract, simulating flattening the DM:
         if self.phase_flat_fits:
             # DM pupil:
             DM_flat=poppy.FITSOpticalElement(opd=self.phase_flat_fits,pixelscale=self.phase_mismatch_meters_pixel,oversample=self.oversample,opdunits='meters',rotation=225)
