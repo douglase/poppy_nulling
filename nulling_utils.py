@@ -140,39 +140,6 @@ def draw_circle(r,dr,amp,cube=False):
 	array=array/num_targ
 	return array
 
-def plot_inset(inFITS,x1, x2, y1, y2,zoom=2.5):
-	'''
-    plots the first array of the FITS hdulist inFITS and a zoomed inset of the subregion defined by [x1:x2,y1:y2]
-    using example from:
-    http://matplotlib.org/mpl_toolkits/axes_grid/users/overview.html#insetlocator
-
-    '''
-    fig, ax = plt.subplots(figsize=[5,5])
-	
-	# prepare the demo image
-	Z = inFITS[0].data
-	Z2 = Z
-	halffov_x = inFITS[0].header['PIXELSCL']*inFITS[0].data.shape[1]/2.0
-	halffov_y = inFITS[0].header['PIXELSCL']*inFITS[0].data.shape[0]/2.0
-	extent = [-halffov_x, halffov_x, -halffov_y, halffov_y]
-	ax.imshow(inFITS[0].data, extent=extent, interpolation="none",
-          origin="lower")
-
-	axins = zoomed_inset_axes(ax, zoom, loc=1) # zoom = 6
-	axins.imshow(Z2, extent=extent, interpolation="nearest",
-             origin="lower")
-
-	# sub region of the original image
-	axins.set_xlim(x1, x2)
-	axins.set_ylim(y1, y2)
-
-	plt.xticks(visible=False)
-	plt.yticks(visible=False)
-
-	# draw a bbox of the region of the inset axes in the parent axes and
-	# connecting lines between the bbox and the inset axes area
-	mark_inset(ax, axins, loc1=2, loc2=4, fc="none", ec="0.5")
-
 def downsample(A, block= (2,2), subarr=False):
     '''
     downsample, a downsampling function
@@ -332,49 +299,49 @@ def find_annular_profiles(HDUlist_or_filename=None,
 
 
 def downsample_display(input,block=(10,10),
-		       save=False,
-		       filename='DownsampledOut.fits',
-		       vmin=1e-8,vmax=1e1,
-		       ax=False,norm='log',add_noise=False):
-	'''
-	takes a wavefront's intensity, and generates a downsampled fits image for display and saving to disk.
-	'''
-	print(str(type(input)))
-	if str(type(input)) == "<class 'astropy.io.fits.hdu.hdulist.HDUList'>":
-		inFITS=input
-	else:
-		try:
-			inFITS=input.asFITS()
-		except Exception, err:
-			print(err)
-			raise ValueError("Type not recognized as wavefront")
-	if ax==False:
-		plt.figure()
-		ax = plt.subplot(111)
-	
-	cmap = matplotlib.cm.jet
-	halffov_x = inFITS[0].header['PIXELSCL']*inFITS[0].data.shape[1]/2
-	halffov_y = inFITS[0].header['PIXELSCL']*inFITS[0].data.shape[0]/2
-	extent = [-halffov_x, halffov_x, -halffov_y, halffov_y]
-	unit="arcsec"
-	if norm=="log":
-		norm=LogNorm(vmin=vmin,vmax=vmax)
-	else:
-		norm=Normalize(vmin=vmin,vmax=vmax)
-	plt.xlabel(unit)
-	downsampled=downsample(inFITS[0].data,block=block)
-	titlestring=str(inFITS[0].data.shape)+" array, downsampled by:"+str(block)
-	plt.title(titlestring)
-	poppy.utils.imshow_with_mouseover(downsampled,ax=ax, interpolation='none',  extent=extent, norm=norm, cmap=cmap)
-	plt.colorbar(ax.images[0])
-	outFITS = fits.HDUList(fits.PrimaryHDU(data=downsampled,header=inFITS[0].header))
-	newpixelscale=inFITS[0].header['PIXELSCL']*block[0]
-	outFITS[0].header.update('PIXELSCL', newpixelscale, 'Scale in arcsec/pix (after oversampling and subsequent downsampling)')
-	outFITS[0].header.add_history(titlestring)
-	try:
-		outFITS.writeto(filename)
-	except Exception, err:
-		print(err)
+                        save=False,
+                        filename='DownsampledOut.fits',
+                        vmin=1e-8,vmax=1e1,
+                        ax=False,norm='log',add_noise=False):
+    '''
+    takes a wavefront's intensity, and generates a downsampled fits image for display and saving to disk.
+    '''
+    print(str(type(input)))
+    if str(type(input)) == "<class 'astropy.io.fits.hdu.hdulist.HDUList'>":
+        inFITS=input
+    else:
+        try:
+            inFITS=input.asFITS()
+        except Exception, err:
+            print(err)
+            raise ValueError("Type not recognized as wavefront")
+    if ax==False:
+        plt.figure()
+        ax = plt.subplot(111)
+        
+    cmap = matplotlib.cm.jet
+    halffov_x = inFITS[0].header['PIXELSCL']*inFITS[0].data.shape[1]/2
+    halffov_y = inFITS[0].header['PIXELSCL']*inFITS[0].data.shape[0]/2
+    extent = [-halffov_x, halffov_x, -halffov_y, halffov_y]
+    unit="arcsec"
+    if norm=="log":
+        norm=LogNorm(vmin=vmin,vmax=vmax)
+    else:
+        norm=Normalize(vmin=vmin,vmax=vmax)
+    plt.xlabel(unit)
+    downsampled=downsample(inFITS[0].data,block=block)
+    titlestring=str(inFITS[0].data.shape)+" array, downsampled by:"+str(block)
+    plt.title(titlestring)
+    poppy.utils.imshow_with_mouseover(downsampled,ax=ax, interpolation='none',  extent=extent, norm=norm, cmap=cmap)
+    plt.colorbar(ax.images[0])
+    outFITS = fits.HDUList(fits.PrimaryHDU(data=downsampled,header=inFITS[0].header))
+    newpixelscale=inFITS[0].header['PIXELSCL']*block[0]
+    outFITS[0].header.update('PIXELSCL', newpixelscale, 'Scale in arcsec/pix (after oversampling and subsequent downsampling)')
+    outFITS[0].header.add_history(titlestring)
+    try:
+        outFITS.writeto(filename)
+    except Exception, err:
+        print(err)
     return outFITS
 
 def InputWavefrontFromField(inwave,field,arcsec_per_pixel,zero_init_wavefront=True):
@@ -418,3 +385,63 @@ def InputWavefrontFromField(inwave,field,arcsec_per_pixel,zero_init_wavefront=Tr
     print(inwave.__class__)        
     inwave.display(what='other',nrows=2,row=1, colorbar=True)
     return inwave
+
+def display_inset(inFITS,x1, x2, y1, y2,zoom=2.0,title="",suppressinset=False,**kwargs):
+    '''
+    displays the first array of the FITS hdulist inFITS and a zoomed inset of the subregion defined by the  [x1:x2,y1:y2] 
+    where x1 etc... are in display units (arc seconds) not pixels number.
+    
+    kwargs are passed to imshow.
+    
+    using example from:
+    http://matplotlib.org/mpl_toolkits/axes_grid/users/overview.html#insetlocator
+    '''
+
+    import matplotlib.pyplot as plt
+
+    from mpl_toolkits.axes_grid1.inset_locator import zoomed_inset_axes
+    from mpl_toolkits.axes_grid1.inset_locator import mark_inset
+
+    import numpy as np
+
+
+    fig, ax = plt.subplots(figsize=[6,5])
+    
+    # prepare the demo image
+    Z = inFITS[0].data
+    Z2 = Z
+    halffov_x = inFITS[0].header['PIXELSCL']*inFITS[0].data.shape[1]/2.0
+    halffov_y = inFITS[0].header['PIXELSCL']*inFITS[0].data.shape[0]/2.0
+    extent = [-halffov_x, halffov_x, -halffov_y, halffov_y]
+    extent = [-12, 12, -12, 12]
+    ax.imshow(Z, extent=extent, interpolation="none",
+              origin="lower",cmap='gist_heat',**kwargs)
+    ax.set_xlabel("Arcseconds",fontsize=16)
+    ax.set_ylabel("Arcseconds",fontsize=16)
+    ax.set_title(title)
+    ax.set_xlim([-8,8])
+    ax.set_ylim([-8,8])
+    axins = zoomed_inset_axes(ax, zoom, loc=1) # zoom = 6
+    if suppressinset==False:
+        axins.imshow(np.array(Z2), extent=extent, interpolation="none",origin="lower",cmap='gist_heat',**kwargs)
+        
+        # sub region of the original image
+        axins.set_xlim(x1, x2)
+        axins.set_ylim(y1, y2)
+        mark_inset(ax, axins, loc1=2, loc2=4, fc="none", ec="0.5",color="white",linewidth=2.)
+    for ax, color in zip([ax, axins], ['white', 'white']):
+        plt.setp(ax.spines.values(), color=color)
+        plt.setp([ax.get_xticklines(), ax.get_yticklines()], color="white")
+        
+    plt.xticks(visible=False)
+    plt.yticks(visible=False)
+    cax = fig.add_axes([0.88, 0.05, 0.05, 0.9])
+    cax.set_title("Counts",size=12)
+    cax.tick_params(labelsize=12)
+    plt.colorbar(ax.images[0],cax=cax) 
+    plt.setp(ax.spines.values(), color='white')
+    plt.setp([ax.get_xticklines(), ax.get_yticklines()], color='white')
+    ax.tick_params(labelsize=16)
+        # draw a bbox of the region of the inset axes in the parent axes and
+        # connecting lines between the bbox and the inset axes area
+    fig.tight_layout()

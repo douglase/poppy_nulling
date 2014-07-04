@@ -70,12 +70,12 @@ class NullingCoronagraph(poppy.OpticalSystem):
         normalize='last',
         save_intermediates=False, display_intermediates=True,
         shear=0.3,
-        nrows=6,
         intensity_mismatch=0.000,
         phase_mismatch_fits=False,
         phase_mismatch_meters_pixel=0, phase_flat_fits=False,
         obscuration_fname=False,
         pupilmask=False,verbose=True,defocus=False,store_pupil=False):
+
         self.phase_mismatch_fits=phase_mismatch_fits
         self.pupilmask=pupilmask
         self.normalize=normalize
@@ -112,14 +112,15 @@ class NullingCoronagraph(poppy.OpticalSystem):
         Returns: a tuple of the dark and bright outputs: (self.wavefront, wavefront_bright).
         Flux should be counts/second.
         '''
+        nrows=6
         if poppy.settings.enable_speed_tests():
             t_start = time.time()
         if prebuilt_wavefront:
             if prebuilt_wavefront.__class__ ==poppy.poppy_core.Wavefront:
                 wavefront=prebuilt_wavefront.copy()
-                raise _log.debug("copying a prebuilt input wavefront:")
-                if display_intermediates:
-                    wavefront.display(what='other',nrows=6,row=1, colorbar=True)
+                _log.debug("copying a prebuilt input wavefront:")
+                if self.display_intermediates:
+                    wavefront.display(what='other',nrows=nrows,row=1, colorbar=True)
             else:
                 raise _log.error("prebuilt_wavefront is not a wavefront class.")
         else:
@@ -132,7 +133,6 @@ class NullingCoronagraph(poppy.OpticalSystem):
         if self.display_intermediates:
             suptitle = plt.suptitle( "Propagating $\lambda=$ %.3f $\mu$m" % (self.wavelength*1.0e6), size='x-large')
 
-            nrows = 6
             #plt.clf()
             #wavefront.display(what='intensity',nrows=nrows,row=1, colorbar=False)
             wavefront *= self.inputpupil
@@ -144,8 +144,8 @@ class NullingCoronagraph(poppy.OpticalSystem):
         if  poppy.settings.enable_flux_tests(): _log.debug("Wavefront multiplied by flux,  Flux === "+str(wavefront.totalIntensity))
         if self.obscuration_fname:
             self.obscuration=poppy.FITSOpticalElement(transmission=self.obscuration_fname,
-                              pixelscale=self.phase_mismatch_meters_pixel,
-                              oversample=self.oversample,opdunits='meters')
+                                pixelscale=self.phase_mismatch_meters_pixel,
+                                oversample=self.oversample,opdunits='meters')
             #only apply obscuration if there is not going to be a pupil plane mask later.
             if not self.pupilmask:
                 wavefront *= self.obscuration
@@ -221,7 +221,7 @@ class NullingCoronagraph(poppy.OpticalSystem):
             displaywavefrontarm=wavefront_arm.copy()
             displaywavefrontarm.wavefront=displaywavefrontarm.wavefront*self.mask_array
             displaywavefrontarm.wavefront=sheararray(displaywavefrontarm.wavefront,-self.shear/2.0)
-            displaywavefrontarm.display(what='other',nrows=2,row=1, colorbar=True,vmax=wavefront_arm.amplitude.max(),vmin=wavefront_arm.amplitude.min())
+            displaywavefrontarm.display(what='other',nrows=nrows,row=1, colorbar=True,vmax=wavefront_arm.amplitude.max(),vmin=wavefront_arm.amplitude.min())
 
 
         wavefront_combined = 0.5*(1.0 + self.intensity_mismatch)*wavefront.wavefront + 0.5*(-1.0 + self.intensity_mismatch)*wavefront_arm.wavefront
@@ -233,7 +233,7 @@ class NullingCoronagraph(poppy.OpticalSystem):
         if self.display_intermediates:
             plt.figure()
             ax=plt.subplot(121)
-            wavefront.display(what='phase',nrows=nrows,row=1, colorbar=True,vmax=wavefront.amplitude.max(),vmin=wavefront.amplitude.min(),ax=ax)
+            wavefront.display(what='phase',nrows=nrows,row=2, colorbar=True,vmax=wavefront.amplitude.max(),vmin=wavefront.amplitude.min(),ax=ax)
 
 
         wavefront.wavefront=wavefront.wavefront*self.mask_array
