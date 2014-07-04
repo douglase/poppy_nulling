@@ -118,12 +118,15 @@ class NullingCoronagraph(poppy.OpticalSystem):
             print(prebuilt_wavefront.__class__)
             if prebuilt_wavefront.__class__ ==poppy.poppy_core.Wavefront:
                 wavefront=prebuilt_wavefront.copy()
-                print("copying a prebuilt input wavefront:")
                 wavefront.display(what='other',nrows=6,row=1, colorbar=True)
+                _log.debug("copying input wavefront, plate scale is:"+str(wavefront.pixelscale))
+
             else:
                 raise _log.error("prebuilt_wavefront is not a wavefront class.")
         else:
             wavefront = self.inputWavefront(wavelength)
+            _log.debug("Generated a new input wavefront, plate scale is:"+str(wavefront.pixelscale))
+
 
         if  poppy.settings.enable_flux_tests(): _log.debug("Wavefront initialized,  Flux === "+str(wavefront.totalIntensity))
 
@@ -195,7 +198,7 @@ class NullingCoronagraph(poppy.OpticalSystem):
             else:
                 _log.warn("phase mismatch is not a FITS HDUList, trying to use it as if it's a FITSOpticalElement.")
                 DM_array=self.phase_mismatch_fits
-
+                
         #a low passed version to subtract, simulating flattening the DM:
         if self.phase_flat_fits:
             # DM pupil:
@@ -209,7 +212,9 @@ class NullingCoronagraph(poppy.OpticalSystem):
             _log.debug("RMS wavefront error in mismatched arm, (includes beyond mask):"+str(np.mean(np.sqrt(DM_array.opd**2))))
             _log.debug("Mean RMS wavefront error in mismatched arm, (includes beyond mask):"+str(np.mean(np.sqrt(DM_array.opd**2))))
             _log.debug("Mean RMS wavefront error in mismatched arm, (only within mask):"    +str(np.mean(np.sqrt((DM_array.opd*self.mask_array)**2))))
+            _log.debug("DM_array plate scale is:"+str(DM_array.pixelscale))
             wavefront_arm *= DM_array
+
         except Exception, err:
             _log.warn(err)
             _log.warn("is DM_array defined?")
