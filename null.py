@@ -182,7 +182,7 @@ class NullingCoronagraph(poppy.OpticalSystem):
             self.mask_array = mask_array
 
         else:
-            self.FITSmask=poppy.FITSOpticalElement(transmission=self.pupilmask,planetype=_PUPIL,rotation=-45,oversample=self.oversample)     
+            self.FITSmask=poppy.FITSOpticalElement(transmission=self.pupilmask,planetype=_PUPIL,rotation=0,oversample=self.oversample,pixelscale=self.phase_mismatch_meters_pixel)   
             #print(self.FITSmask.pixelscale)
             #offset mask onto the sheared array
             self.mask_array = np.roll(self.FITSmask.amplitude,int(round(self.FITSmask.amplitude.shape[0]*self.shear)/2.0))
@@ -193,12 +193,12 @@ class NullingCoronagraph(poppy.OpticalSystem):
             #let the dead actuators through: not implimented.
             #DM pupil.
             if type(self.phase_mismatch_fits)==astropy.io.fits.hdu.hdulist.HDUList:
-                DM_array = poppy.FITSOpticalElement(opd=self.phase_mismatch_fits, pixelscale=self.phase_mismatch_meters_pixel,oversample=self.oversample,opdunits='meters',rotation=225)
+                DM_array = poppy.FITSOpticalElement(opd=self.phase_mismatch_fits, pixelscale=self.phase_mismatch_meters_pixel,oversample=self.oversample,opdunits='meters',rotation=0)
             if type(self.phase_mismatch_fits)==poppy.FITSOpticalElement:
                 DM_array = self.phase_mismatch_fits
             if type(self.phase_mismatch_fits) == type('string'):
                 try:
-                    DM_array = poppy.FITSOpticalElement(opd=astropy.io.fits.open(self.phase_mismatch_fits), pixelscale=self.phase_mismatch_meters_pixel,oversample=self.oversample,opdunits='meters',rotation=225)
+                    DM_array = poppy.FITSOpticalElement(opd=astropy.io.fits.open(self.phase_mismatch_fits), pixelscale=self.phase_mismatch_meters_pixel,oversample=self.oversample,opdunits='meters',rotation=0)
                 except Exception,err:
                     _log.warn(err)
             else:
@@ -208,7 +208,7 @@ class NullingCoronagraph(poppy.OpticalSystem):
         #a low passed version to subtract, simulating flattening the DM:
         if self.phase_flat_fits:
             # DM pupil:
-            DM_flat=poppy.FITSOpticalElement(opd=self.phase_flat_fits,pixelscale=self.phase_mismatch_meters_pixel,oversample=self.oversample,opdunits='meters',rotation=225)
+            DM_flat=poppy.FITSOpticalElement(opd=self.phase_flat_fits,pixelscale=self.phase_mismatch_meters_pixel,oversample=self.oversample,opdunits='meters',rotation=0)
             DM_array.opd=DM_array.opd-DM_flat.opd
             #center DM on mask:
             DM_array.opd= sheararray(DM_array.opd,-self.shear/2.0)
