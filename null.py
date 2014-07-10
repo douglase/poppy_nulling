@@ -70,12 +70,12 @@ class NullingCoronagraph(poppy.OpticalSystem):
         normalize='last',
         save_intermediates=False, display_intermediates=True,
         shear=0.3,
-        nrows=6,
         intensity_mismatch=0.000,
         phase_mismatch_fits=False,
         phase_mismatch_meters_pixel=0, phase_flat_fits=False,
         obscuration_fname=False,
         pupilmask=False,verbose=True,defocus=False,store_pupil=False):
+
         self.phase_mismatch_fits=phase_mismatch_fits
         self.pupilmask=pupilmask
         self.normalize=normalize
@@ -112,14 +112,15 @@ class NullingCoronagraph(poppy.OpticalSystem):
         Returns: a tuple of the dark and bright outputs: (self.wavefront, wavefront_bright).
         Flux should be counts/second.
         '''
+        nrows=6
         if poppy.settings.enable_speed_tests():
             t_start = time.time()
         if prebuilt_wavefront:
             if prebuilt_wavefront.__class__ ==poppy.poppy_core.Wavefront:
                 wavefront=prebuilt_wavefront.copy()
-                wavefront.display(what='other',nrows=6,row=1, colorbar=True)
-                _log.debug("copying input wavefront, plate scale is:"+str(wavefront.pixelscale))
-
+                _log.debug("copying a prebuilt input wavefront:")
+                if self.display_intermediates:
+                    wavefront.display(what='other',nrows=nrows,row=1, colorbar=True)
             else:
                 raise _log.error("prebuilt_wavefront is not a wavefront class.")
         else:
@@ -129,14 +130,11 @@ class NullingCoronagraph(poppy.OpticalSystem):
 
         if  poppy.settings.enable_flux_tests(): _log.debug("Wavefront initialized,  Flux === "+str(wavefront.totalIntensity))
 
-        print(wavefront.wavefront.real.max())
-
         if self.save_intermediates:
             raise NotImplemented("not yet")
         if self.display_intermediates:
             suptitle = plt.suptitle( "Propagating $\lambda=$ %.3f $\mu$m" % (self.wavelength*1.0e6), size='x-large')
 
-            nrows = 6
             #plt.clf()
             #wavefront.display(what='intensity',nrows=nrows,row=1, colorbar=False)
             wavefront *= self.inputpupil
@@ -148,8 +146,8 @@ class NullingCoronagraph(poppy.OpticalSystem):
         if  poppy.settings.enable_flux_tests(): _log.debug("Wavefront multiplied by flux,  Flux === "+str(wavefront.totalIntensity))
         if self.obscuration_fname:
             self.obscuration=poppy.FITSOpticalElement(transmission=self.obscuration_fname,
-                              pixelscale=self.phase_mismatch_meters_pixel,
-                              oversample=self.oversample,opdunits='meters')
+                                pixelscale=self.phase_mismatch_meters_pixel,
+                                oversample=self.oversample,opdunits='meters')
             #only apply obscuration if there is not going to be a pupil plane mask later.
             if not self.pupilmask:
                 wavefront *= self.obscuration
@@ -182,8 +180,13 @@ class NullingCoronagraph(poppy.OpticalSystem):
             self.mask_array = mask_array
 
         else:
+<<<<<<< HEAD
             self.FITSmask=poppy.FITSOpticalElement(transmission=self.pupilmask,planetype=_PUPIL,rotation=0,oversample=self.oversample,pixelscale=self.phase_mismatch_meters_pixel)   
             #print(self.FITSmask.pixelscale)
+=======
+            self.FITSmask=poppy.FITSOpticalElement(transmission=self.pupilmask,planetype=_PUPIL,rotation=-45,oversample=self.oversample)     
+            _log.debug("mask pixel scale:"+str(self.FITSmask.pixelscale))
+>>>>>>> 7f49bf6286cf092a1d588755b24bc5e6e9b3dfcd
             #offset mask onto the sheared array
             self.mask_array = np.roll(self.FITSmask.amplitude,int(round(self.FITSmask.amplitude.shape[0]*self.shear)/2.0))
 
@@ -208,7 +211,16 @@ class NullingCoronagraph(poppy.OpticalSystem):
         #a low passed version to subtract, simulating flattening the DM:
         if self.phase_flat_fits:
             # DM pupil:
+<<<<<<< HEAD
             DM_flat=poppy.FITSOpticalElement(opd=self.phase_flat_fits,pixelscale=self.phase_mismatch_meters_pixel,oversample=self.oversample,opdunits='meters',rotation=0)
+=======
+            if type(self.phase_mismatch_fits)==astropy.io.fits.hdu.hdulist.HDUList:
+                DM_flat=poppy.FITSOpticalElement(opd=self.phase_flat_fits,pixelscale=self.phase_mismatch_meters_pixel,
+                                                 oversample=self.oversample,opdunits='meters',rotation=225)
+            else:
+                _log.warn("phase mismatch is not a FITS HDUList, trying to use it as if it's a FITSOpticalElement.")
+                DM_arrayDM_flat=self.phase_mismatch_fitsphase_flat_fits
+>>>>>>> 7f49bf6286cf092a1d588755b24bc5e6e9b3dfcd
             DM_array.opd=DM_array.opd-DM_flat.opd
             #center DM on mask:
             DM_array.opd= sheararray(DM_array.opd,-self.shear/2.0)
@@ -241,7 +253,7 @@ class NullingCoronagraph(poppy.OpticalSystem):
             displaywavefrontarm=wavefront_arm.copy()
             displaywavefrontarm.wavefront=displaywavefrontarm.wavefront*self.mask_array
             displaywavefrontarm.wavefront=sheararray(displaywavefrontarm.wavefront,-self.shear/2.0)
-            displaywavefrontarm.display(what='other',nrows=2,row=1, colorbar=True,vmax=wavefront_arm.amplitude.max(),vmin=wavefront_arm.amplitude.min())
+            displaywavefrontarm.display(what='other',nrows=nrows,row=1, colorbar=True,vmax=wavefront_arm.amplitude.max(),vmin=wavefront_arm.amplitude.min())
 
 
         wavefront_combined = 0.5*(1.0 + self.intensity_mismatch)*wavefront.wavefront + 0.5*(-1.0 + self.intensity_mismatch)*wavefront_arm.wavefront
@@ -249,6 +261,16 @@ class NullingCoronagraph(poppy.OpticalSystem):
 
         wavefront.wavefront=wavefront_combined
 
+<<<<<<< HEAD
+=======
+        #plt.imshow(mask_array)
+        if self.display_intermediates:
+            plt.figure()
+            ax=plt.subplot(121)
+            wavefront.display(what='phase',nrows=nrows,row=2, colorbar=True,vmax=wavefront.amplitude.max(),vmin=wavefront.amplitude.min(),ax=ax)
+
+
+>>>>>>> 7f49bf6286cf092a1d588755b24bc5e6e9b3dfcd
         wavefront.wavefront=wavefront.wavefront*self.mask_array
         wavefront_bright.wavefront=wavefront_bright.wavefront*self.mask_array
         #recenter arrays, almost:
@@ -307,55 +329,5 @@ class NullingCoronagraph(poppy.OpticalSystem):
             if self.verbose: _log.info(" nulled in %g " % deltat)
         return(self.wavefront, wavefront_bright)
     # self.pupil_plane_dark =	wavefront.copy()
-
-
-
-def downsample_display(input,block=(10,10),
-		       save=False,
-		       filename='DownsampledOut.fits',
-		       vmin=1e-8,vmax=1e1,
-		       ax=False,norm='log',add_noise=False):
-	'''
-	takes a wavefront's intensity, and generates a downsampled fits image for display and saving to disk.
-	'''
-	print(str(type(input)))
-	if str(type(input)) == "<class 'astropy.io.fits.hdu.hdulist.HDUList'>":
-		inFITS=input
-	else:
-		try:
-			inFITS=input.asFITS()
-		except Exception, err:
-			print(err)
-			raise ValueError("Type not recognized as wavefront")
-	if ax==False:
-		plt.figure()
-		ax = plt.subplot(111)
-	
-	cmap = matplotlib.cm.jet
-	halffov_x = inFITS[0].header['PIXELSCL']*inFITS[0].data.shape[1]/2
-	halffov_y = inFITS[0].header['PIXELSCL']*inFITS[0].data.shape[0]/2
-	extent = [-halffov_x, halffov_x, -halffov_y, halffov_y]
-	unit="arcsec"
-	if norm=="log":
-		norm=LogNorm(vmin=vmin,vmax=vmax)
-	else:
-		norm=Normalize(vmin=vmin,vmax=vmax)
-	plt.xlabel(unit)
-	downsampled=downsample(inFITS[0].data,block=block)
-	titlestring=str(inFITS[0].data.shape)+" array, downsampled by:"+str(block)
-	plt.title(titlestring)
-	poppy.utils.imshow_with_mouseover(downsampled,ax=ax, interpolation='none',  extent=extent, norm=norm, cmap=cmap)
-	plt.colorbar(ax.images[0])
-	outFITS = fits.HDUList(fits.PrimaryHDU(data=downsampled,header=inFITS[0].header))
-	newpixelscale=inFITS[0].header['PIXELSCL']*block[0]
-	outFITS[0].header.update('PIXELSCL', newpixelscale, 'Scale in arcsec/pix (after oversampling and subsequent downsampling)')
-	outFITS[0].header.add_history(titlestring)
-	try:
-		outFITS.writeto(filename)
-	except Exception, err:
-		print(err)
-        return outFITS
-
-
 
 
