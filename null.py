@@ -180,13 +180,9 @@ class NullingCoronagraph(poppy.OpticalSystem):
             self.mask_array = mask_array
 
         else:
-<<<<<<< HEAD
             self.FITSmask=poppy.FITSOpticalElement(transmission=self.pupilmask,planetype=_PUPIL,rotation=0,oversample=self.oversample,pixelscale=self.phase_mismatch_meters_pixel)   
             #print(self.FITSmask.pixelscale)
-=======
-            self.FITSmask=poppy.FITSOpticalElement(transmission=self.pupilmask,planetype=_PUPIL,rotation=-45,oversample=self.oversample)     
-            _log.debug("mask pixel scale:"+str(self.FITSmask.pixelscale))
->>>>>>> 7f49bf6286cf092a1d588755b24bc5e6e9b3dfcd
+
             #offset mask onto the sheared array
             self.mask_array = np.roll(self.FITSmask.amplitude,int(round(self.FITSmask.amplitude.shape[0]*self.shear)/2.0))
 
@@ -211,16 +207,14 @@ class NullingCoronagraph(poppy.OpticalSystem):
         #a low passed version to subtract, simulating flattening the DM:
         if self.phase_flat_fits:
             # DM pupil:
-<<<<<<< HEAD
-            DM_flat=poppy.FITSOpticalElement(opd=self.phase_flat_fits,pixelscale=self.phase_mismatch_meters_pixel,oversample=self.oversample,opdunits='meters',rotation=0)
-=======
+
             if type(self.phase_mismatch_fits)==astropy.io.fits.hdu.hdulist.HDUList:
                 DM_flat=poppy.FITSOpticalElement(opd=self.phase_flat_fits,pixelscale=self.phase_mismatch_meters_pixel,
-                                                 oversample=self.oversample,opdunits='meters',rotation=225)
+                                                 oversample=self.oversample,opdunits='meters',rotation=0 )
             else:
                 _log.warn("phase mismatch is not a FITS HDUList, trying to use it as if it's a FITSOpticalElement.")
                 DM_arrayDM_flat=self.phase_mismatch_fitsphase_flat_fits
->>>>>>> 7f49bf6286cf092a1d588755b24bc5e6e9b3dfcd
+
             DM_array.opd=DM_array.opd-DM_flat.opd
             #center DM on mask:
             DM_array.opd= sheararray(DM_array.opd,-self.shear/2.0)
@@ -261,8 +255,6 @@ class NullingCoronagraph(poppy.OpticalSystem):
 
         wavefront.wavefront=wavefront_combined
 
-<<<<<<< HEAD
-=======
         #plt.imshow(mask_array)
         if self.display_intermediates:
             plt.figure()
@@ -270,7 +262,6 @@ class NullingCoronagraph(poppy.OpticalSystem):
             wavefront.display(what='phase',nrows=nrows,row=2, colorbar=True,vmax=wavefront.amplitude.max(),vmin=wavefront.amplitude.min(),ax=ax)
 
 
->>>>>>> 7f49bf6286cf092a1d588755b24bc5e6e9b3dfcd
         wavefront.wavefront=wavefront.wavefront*self.mask_array
         wavefront_bright.wavefront=wavefront_bright.wavefront*self.mask_array
         #recenter arrays, almost:
