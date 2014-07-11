@@ -192,10 +192,14 @@ class NullingCoronagraph(poppy.OpticalSystem):
             #let the dead actuators through: not implimented.
             #DM pupil.
             if type(self.phase_mismatch_fits)==astropy.io.fits.hdu.hdulist.HDUList:
+                _log.debug("phase mismatch is an HDUList")
                 DM_array = poppy.FITSOpticalElement(opd=self.phase_mismatch_fits, pixelscale=self.phase_mismatch_meters_pixel,oversample=self.oversample,opdunits='meters',rotation=0)
             if type(self.phase_mismatch_fits)==poppy.FITSOpticalElement:
+                _log.debug("phase mismatch is a FITSOptical Element")
                 DM_array = self.phase_mismatch_fits
+
             if type(self.phase_mismatch_fits) == type('string'):
+                _log.debug("Phase mismatch is a string, trying to open as a fits file")
                 try:
                     DM_array = poppy.FITSOpticalElement(opd=astropy.io.fits.open(self.phase_mismatch_fits), pixelscale=self.phase_mismatch_meters_pixel,oversample=self.oversample,opdunits='meters',rotation=0)
                 except Exception,err:
@@ -208,12 +212,19 @@ class NullingCoronagraph(poppy.OpticalSystem):
         if self.phase_flat_fits:
             # DM pupil:
 
-            if type(self.phase_mismatch_fits)==astropy.io.fits.hdu.hdulist.HDUList:
+            if type(self.phase_flat_fits)==astropy.io.fits.hdu.hdulist.HDUList:
                 DM_flat=poppy.FITSOpticalElement(opd=self.phase_flat_fits,pixelscale=self.phase_mismatch_meters_pixel,
                                                  oversample=self.oversample,opdunits='meters',rotation=0 )
+                
+            if type(self.phase_flat_fits) == type('string'):
+                _log.debug(" phase_flat_fits is a string, trying to open as a fits file")
+                try:
+                    DM_flat = poppy.FITSOpticalElement(opd=astropy.io.fits.open(self.phase_flat_fits), pixelscale=self.phase_mismatch_meters_pixel,oversample=self.oversample,opdunits='meters',rotation=0)
+                except Exception,err:
+                    _log.warn(err)
             else:
                 _log.warn("phase mismatch is not a FITS HDUList, trying to use it as if it's a FITSOpticalElement.")
-                DM_arrayDM_flat=self.phase_mismatch_fitsphase_flat_fits
+                DM_flat=self.phase_flat_fits
 
             DM_array.opd=DM_array.opd-DM_flat.opd
             #center DM on mask:

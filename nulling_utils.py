@@ -79,11 +79,11 @@ def add_nuller_to_header(primaryHDU,nuller):
 	
 	primaryHDU.header['PIXELSCL']=nuller.wavefront.asFITS()[0].header['PIXELSCL']
 	primaryHDU.header.update("shear",str(nuller.shear))
-	primaryHDU.header.update('phase mismatch',str(nuller.phase_mismatch_fits))
-	primaryHDU.header.update('phase flat field (DM correction)',str(nuller.phase_flat_fits))
-	primaryHDU.header.update('Intensity Mismatch',str(nuller.intensity_mismatch))
-	primaryHDU.header.update('pupil mask',str(nuller.pupilmask))
-	primaryHDU.header.add_history('name: '+str(nuller.name))
+	primaryHDU.header.update('hierarch phase mismatch',str(nuller.phase_mismatch_fits))
+	primaryHDU.header.update('hierarch phase flat field (DM correction)',str(nuller.phase_flat_fits))
+	primaryHDU.header.update('hierarch Intensity Mismatch',str(nuller.intensity_mismatch))
+	primaryHDU.header.update('hierarch mask',str(nuller.pupilmask))
+	primaryHDU.header.add_history('hierarch name: '+str(nuller.name))
 
 	#return primaryHDU
 	
