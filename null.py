@@ -8,7 +8,7 @@ import numpy as np
 import astropy
 import time
 
-_log = logging.getLogger('poppy-null')
+_log = logging.getLogger('poppy')
 print("logging")
 _log.setLevel(logging.DEBUG)
 _log.debug("logging")
@@ -180,7 +180,19 @@ class NullingCoronagraph(poppy.OpticalSystem):
             self.mask_array = mask_array
 
         else:
-            self.FITSmask=poppy.FITSOpticalElement(transmission=self.pupilmask,planetype=_PUPIL,rotation=0,oversample=self.oversample,pixelscale=self.phase_mismatch_meters_pixel)   
+
+            if (type(self.pupilmask)==astropy.io.fits.hdu.hdulist.HDUList) |   (type(self.pupilmask)==type('string')):
+                _log.debug("pupilmask  is an HDUList or string" )
+                self.FITSmask = poppy.FITSOpticalElement(transmission=self.pupilmask, pixelscale=self.phase_mismatch_meters_pixel,oversample=self.oversample,opdunits='meters',rotation=0)
+            elif type(self.pupilmask)==poppy.FITSOpticalElement:
+                _log.debug("self.pupilmask  is a FITSOptical Element")
+                self.FITSmask = self.pupilmask
+        
+            else:
+                _log.warn("pupilmask mismatch is not a FITS HDUList, trying to use it as if it's a FITSOpticalElement")
+                self.FITSmask = self.pupilmask
+                
+            #self.FITSmask=poppy.FITSOpticalElement(transmission=self.pupilmask,planetype=_PUPIL,rotation=0,oversample=self.oversample,pixelscale=self.phase_mismatch_meters_pixel)   
             #print(self.FITSmask.pixelscale)
 
             #offset mask onto the sheared array
@@ -191,19 +203,16 @@ class NullingCoronagraph(poppy.OpticalSystem):
             #this alsgo filters out the dead actuators.
             #let the dead actuators through: not implimented.
             #DM pupil.
-            if type(self.phase_mismatch_fits)==astropy.io.fits.hdu.hdulist.HDUList:
+            if (type(self.phase_mismatch_fits)==astropy.io.fits.hdu.hdulist.HDUList) | (type(self.phase_mismatch_fits) == type('string')):
                 _log.debug("phase mismatch is an HDUList")
-                DM_array = poppy.FITSOpticalElement(opd=self.phase_mismatch_fits, pixelscale=self.phase_mismatch_meters_pixel,oversample=self.oversample,opdunits='meters',rotation=0)
-            if type(self.phase_mismatch_fits)==poppy.FITSOpticalElement:
+                try:
+                    DM_array = poppy.FITSOpticalElement(opd=self.phase_mismatch_fits, pixelscale=self.phase_mismatch_meters_pixel,oversample=self.oversample,opdunits='meters',rotation=0)
+                except Exception,err:
+                    _log.warn(err)
+            elif type(self.phase_mismatch_fits)==poppy.FITSOpticalElement:
                 _log.debug("phase mismatch is a FITSOptical Element")
                 DM_array = self.phase_mismatch_fits
 
-            if type(self.phase_mismatch_fits) == type('string'):
-                _log.debug("Phase mismatch is a string, trying to open as a fits file")
-                try:
-                    DM_array = poppy.FITSOpticalElement(opd=astropy.io.fits.open(self.phase_mismatch_fits), pixelscale=self.phase_mismatch_meters_pixel,oversample=self.oversample,opdunits='meters',rotation=0)
-                except Exception,err:
-                    _log.warn(err)
             else:
                 _log.warn("phase mismatch is not a FITS HDUList, trying to use it as if it's a FITSOpticalElement")
                 DM_array = self.phase_mismatch_fits
@@ -217,7 +226,7 @@ class NullingCoronagraph(poppy.OpticalSystem):
                                                  oversample=self.oversample,opdunits='meters',rotation=0 )
                 
             if type(self.phase_flat_fits) == type('string'):
-                _log.debug(" phase_flat_fits is a string, trying to open as a fits file")
+                _log.debug("phase_flat_fits is a string, trying to open as a fits file")
                 try:
                     DM_flat = poppy.FITSOpticalElement(opd=astropy.io.fits.open(self.phase_flat_fits), pixelscale=self.phase_mismatch_meters_pixel,oversample=self.oversample,opdunits='meters',rotation=0)
                 except Exception,err:
