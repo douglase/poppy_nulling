@@ -195,7 +195,8 @@ def find_annular_profiles(HDUlist_or_filename=None,
 			  stddev=False, binsize=None,
 			  maxradius=None):
     """
-    Hack of popp.utils.radial_profile adding an array of annular values when STDDEV=True
+    Hack of poppy.utils.radial_profile adding an array of annular values when STDDEV=True,
+    that is (radial bins in arcseconds, sttdev of bins, arrays of values in those bins)
     """
 
 
