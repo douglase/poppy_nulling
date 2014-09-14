@@ -56,7 +56,7 @@ class NullingCoronagraph(poppy.OpticalSystem):
     phase_mismatch_fits: hdulist, filename or False
         array of phase mismatch values. default is False.
     phase_mismatch_meters_pixel: float
-        scaling number of meters per pixel for mapping of phase mismatch to the pupil plane. default 1.0/32.0
+        scaling number of meters per pixel for mapping of phase mismatch to the pupil plane. 
     phase_flat_fits:HDUlist,filename,False
         a phase flattening array, i.e. a low pass filtered DM phase map, to be subtracted from the phase mismatch, must have same scale. default false
     pupilmask: fits filename, hduList, False
@@ -161,7 +161,7 @@ class NullingCoronagraph(poppy.OpticalSystem):
         Flux should be counts/second.
         '''
         nrows=6
-        if poppy.settings.enable_speed_tests():
+        if poppy.Conf.enable_speed_tests():
             t_start = time.time()
         if prebuilt_wavefront:
             if prebuilt_wavefront.__class__ ==poppy.poppy_core.Wavefront:
@@ -176,7 +176,7 @@ class NullingCoronagraph(poppy.OpticalSystem):
             _log.debug("Generated a new input wavefront, plate scale is:"+str(wavefront.pixelscale))
 
 
-        if  poppy.settings.enable_flux_tests(): _log.debug("Wavefront initialized,  Flux === "+str(wavefront.totalIntensity))
+        if  poppy.Conf.enable_flux_tests(): _log.debug("Wavefront initialized,  Flux === "+str(wavefront.totalIntensity))
 
         if self.save_intermediates:
             raise NotImplemented("not yet")
@@ -191,7 +191,7 @@ class NullingCoronagraph(poppy.OpticalSystem):
         wavefront.normalize()
         wavefront *= np.sqrt(flux)
         _log.debug("Normalized all planes, after the unobscured aperture, then multiplied by incident flux %s",str(flux))
-        if  poppy.settings.enable_flux_tests(): _log.debug("Wavefront multiplied by flux,  Flux === "+str(wavefront.totalIntensity))
+        if  poppy.Conf.enable_flux_tests(): _log.debug("Wavefront multiplied by flux,  Flux === "+str(wavefront.totalIntensity))
         if self.obscuration_fname:
             self.obscuration=poppy.FITSOpticalElement(transmission=self.obscuration_fname,
                                 pixelscale=self.phase_mismatch_meters_pixel,
@@ -299,8 +299,8 @@ class NullingCoronagraph(poppy.OpticalSystem):
 
         wavefront_bright.wavefront = sheararray(wavefront_bright.wavefront,-self.shear/2.0)
 
-        if  poppy.settings.enable_flux_tests(): _log.debug("Masked Dark output (wavefront),  Flux === "+str(wavefront.totalIntensity))
-        if  poppy.settings.enable_flux_tests(): _log.debug("Masked Bright output, (wavefront_bright),  Flux === "+str(wavefront_bright.totalIntensity))
+        if  poppy.Conf.enable_flux_tests(): _log.debug("Masked Dark output (wavefront),  Flux === "+str(wavefront.totalIntensity))
+        if  poppy.Conf.enable_flux_tests(): _log.debug("Masked Bright output, (wavefront_bright),  Flux === "+str(wavefront_bright.totalIntensity))
         
         #plt.imshow(mask_array)
         if self.display_intermediates:
@@ -338,13 +338,13 @@ class NullingCoronagraph(poppy.OpticalSystem):
         '''
         wavefront.propagateTo(self.detector)
         wavefront_bright.propagateTo(self.detector)
-        if poppy.settings.enable_flux_tests():
+        if poppy.Conf.enable_flux_tests():
              _log.debug(" Dark output in front of detector (wavefront),  Flux === "+str(wavefront.totalIntensity))
              _log.debug(" Bright output in front of detector (wavefront_bright),  Flux === "+str(wavefront_bright.totalIntensity))
         self.wavefront = wavefront#.wavefront #.asFITS()
         self.wavefront_bright = wavefront_bright#.wavefront #.asFITS()
         self.nullerstatus=True
-        if poppy.settings.enable_speed_tests():
+        if poppy.Conf.enable_speed_tests():
             t_stop = time.time()
             deltat=t_stop-t_start
             if self.verbose: _log.info(" nulled in %g " % deltat)
