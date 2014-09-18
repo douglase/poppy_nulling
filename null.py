@@ -20,7 +20,9 @@ _DETECTOR = 3 # specialized type of image plane.
 _ROTATION = 4 # not a real optic, just a coordinate transform
 _typestrs = ['', 'Pupil plane', 'Image plane', 'Detector', 'Rotation']
 
-
+poppy.Conf.use_fftw.set(True)
+poppy.Conf.enable_speed_tests.set(True)
+poppy.Conf.autosave_fftw_wisdom.set(True)
 def sheararray(inputwavefront,shear):
     sheared = np.roll(inputwavefront,int(round(inputwavefront.shape[0]*shear)))
     return sheared
