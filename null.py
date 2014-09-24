@@ -23,8 +23,10 @@ _typestrs = ['', 'Pupil plane', 'Image plane', 'Detector', 'Rotation']
 poppy.Conf.use_fftw.set(True)
 poppy.Conf.enable_speed_tests.set(True)
 poppy.Conf.autosave_fftw_wisdom.set(True)
-def sheararray(inputwavefront,shear):
-    sheared = np.roll(inputwavefront,int(round(inputwavefront.shape[0]*shear)))
+def sheararray(inputarray,shear,pixelscale):
+    npix_shear=np.int64(np.round(shear/pixelscale))
+    _log.debug("shearing by %3f pixels"%npix_shear)
+    sheared = np.roll(inputarray,npix_shear)
     return sheared
 
 class NullingCoronagraph(poppy.OpticalSystem):
@@ -112,32 +114,45 @@ class NullingCoronagraph(poppy.OpticalSystem):
         self.oversample = oversample
         self.store_pupil=store_pupil
 
+        
         if self.phase_mismatch_fits:
-            _log.debug("initializing a phase error in this class")
+            self.init_wfe_error()
+    def init_wfe_error(self):
+        '''Read the HDULIst or FITSOptical element self.phase_mismatch_fits and
+            transforms it into the internal FITSOpticalElement "self.DM_array"
+            (though it doesn't have to be a deformable mirror)
+            also if self.phase_flats_fits exists, it will be subtracted off of self.DM_array,
+             allowing simulation of adaptive corrections to the input
+             phase mismatch fits.
+        '''
+            
+        _log.debug("initializing a phase error in this class")
 
-            #this alsgo filters out the dead actuators.
-            #let the dead actuators through: not implimented.
-            #DM pupil.
-            if (type(self.phase_mismatch_fits)==astropy.io.fits.hdu.hdulist.HDUList) | (type(self.phase_mismatch_fits) == type('string')):
-                _log.debug("phase mismatch is an HDUList")
-                try:
-                    self.DM_array = poppy.FITSOpticalElement(opd=self.phase_mismatch_fits, pixelscale=self.phase_mismatch_meters_pixel,oversample=self.oversample,opdunits='meters',rotation=0)
-                except Exception,err:
-                 _log.warn(err)
-            elif type(self.phase_mismatch_fits)==poppy.FITSOpticalElement:
-                _log.debug("phase mismatch is a FITSOptical Element")
-                DM_array = self.phase_mismatch_fits
+        #this also filters out the dead actuators.
+        #let the dead actuators through: not implimented.
+        #DM pupil.
+        if (type(self.phase_mismatch_fits)==astropy.io.fits.hdu.hdulist.HDUList) | (type(self.phase_mismatch_fits) == type('string')):
+            _log.debug("phase mismatch is an HDUList")
+            try:
+                self.DM_array = poppy.FITSOpticalElement(opd=self.phase_mismatch_fits, pixelscale=self.phase_mismatch_meters_pixel,oversample=self.oversample,opdunits='meters',rotation=0)
+            except Exception,err:
+                _log.warn(err)
+        elif type(self.phase_mismatch_fits)==poppy.FITSOpticalElement:
+            _log.debug("phase mismatch is a FITSOptical Element")
+            DM_array = self.phase_mismatch_fits
 
-            else:
-                _log.warn("phase mismatch is not a FITS HDUList, trying to use it as if it's a FITSOpticalElement")
-                DM_array = self.phase_mismatch_fits
-                
+        else:
+            _log.warn("phase mismatch is not a FITS HDUList, trying to use it as if it's a FITSOpticalElement")
+            DM_array = self.phase_mismatch_fits
+            
             #a low passed version to subtract, simulating flattening the DM:
             if self.phase_flat_fits:
+                _log.debug("A phase_flat_fits exists, if compatible, it will be subtracted from self.DM_array")
+
                 # DM pupil:
                 if type(self.phase_flat_fits)==astropy.io.fits.hdu.hdulist.HDUList:
                     DM_flat=poppy.FITSOpticalElement(opd=self.phase_flat_fits,pixelscale=self.phase_mismatch_meters_pixel,
-                                                 oversample=self.oversample,opdunits='meters',rotation=0 )
+                                                     oversample=self.oversample,opdunits='meters',rotation=0 )
                 if type(self.phase_flat_fits) == type('string'):
                     _log.debug("phase_flat_fits is a string, trying to open as a fits file")
                     try:
@@ -145,16 +160,20 @@ class NullingCoronagraph(poppy.OpticalSystem):
                     except Exception,err:
                         _log.warn(err)
                 else:
-                    _log.warn("phase flat is not a FITS HDUList, trying to use it as if it's a FITSOpticalElement.")
-                    DM_flat=self.phase_flat_fits
-                phase_error=DM_array.opd-DM_flat.opd
-                self.DM_array=poppy.FITSOpticalElement(opd=astropy.io.fits.HDUList(astropy.io.fits.ImageHDU(phase_error)), pixelscale=self.phase_mismatch_meters_pixel,oversample=self.oversample,opdunits='meters',rotation=0)
-                self.DM_array.opd= sheararray(self.DM_array.opd,-self.shear/2.0)
+                    try:
+                        _log.debug("phase flat is not a FITS HDUList, trying to use it as if it's a FITSOpticalElement.")
+                        DM_flat=self.phase_flat_fits
+                        phase_error=DM_array.opd-DM_flat.opd
+                        self.DM_array=poppy.FITSOpticalElement(opd=astropy.io.fits.HDUList(astropy.io.fits.ImageHDU(phase_error)), pixelscale=self.phase_mismatch_meters_pixel,oversample=self.oversample,opdunits='meters',rotation=0)
+                        #self.DM_array.opd= sheararray(self.DM_array.opd,self.shear,self.DM_array.pixelscale)
+                    except Exception,err:
+                        _log.warn(err)
             else:
                 phase_error=DM_array.opd
                 self.DM_array=poppy.FITSOpticalElement(opd=astropy.io.fits.HDUList(astropy.io.fits.ImageHDU(phase_error)), pixelscale=self.phase_mismatch_meters_pixel,oversample=self.oversample,opdunits='meters',rotation=0)
-                self.DM_array.opd= sheararray(self.DM_array.opd,-self.shear/2.0)
-            
+                #self.DM_array.opd= sheararray(self.DM_array.opd,self.shear,self.DM_array.pixelscale)
+            _log.debug("initialized:"+str(self.DM_array))
+                        
     def null(self,wavelength=0.633e-6,wave_weight=1,flux=1.0,offset_x=0.0,offset_y=0.0,prebuilt_wavefront=False):
         '''
         nulls the Nulling Coronagraph according to the optical system prescription.
@@ -218,12 +237,12 @@ class NullingCoronagraph(poppy.OpticalSystem):
         wavefront_bright= wavefront.copy()
 
         if not self.pupilmask:
-            mask= wavefront_ideal.wavefront + sheararray(wavefront_ideal.wavefront,self.shear)
+            mask= wavefront_ideal.wavefront + sheararray(wavefront_ideal.wavefront,self.shear,wavefront_ideal.pixelscale)
             mask_array=np.zeros(wavefront.shape)
             mask_array[np.where(mask  >1.1 )]=1.0
             mask_array[np.where(mask < 1)]=0
             #force area wrapped back over the leading edge to zero:
-            mask_array[:,0:int(round(wavefront.wavefront.shape[0]*self.shear))]=0
+            mask_array[:,0:int(round(self.shear/wavefront.pixelscale))]=0
             self.mask_array = mask_array
 
         else:
@@ -243,8 +262,7 @@ class NullingCoronagraph(poppy.OpticalSystem):
             #print(self.FITSmask.pixelscale)
 
             #offset mask onto the sheared array
-            self.mask_array = np.roll(self.FITSmask.amplitude,int(round(self.FITSmask.amplitude.shape[0]*self.shear)/2.0))
-
+            self.mask_array = self.FITSmask.amplitude# sheararray(self.FITSmask.amplitude,self.shear,self.FITSmask.pixelscale)
             #calculate the effect of phase differences between the arms:
 
             #center DM on mask:
@@ -254,7 +272,9 @@ class NullingCoronagraph(poppy.OpticalSystem):
         try:
             _log.debug("RMS OPD error mismatch, (includes beyond mask):"+str(np.mean(np.sqrt(self.DM_array.opd**2))))
             _log.debug("Mean RMS OPD error in mismatched arm, (includes beyond mask):"+str(np.mean(np.sqrt(self.DM_array.opd**2))))
-            _log.debug("Mean RMS OPD error in mismatched arm, (only within mask):"    +str(np.mean(np.sqrt((self.DM_array.opd*self.mask_array)**2))))
+            _log.debug("Mean RMS Amplitude error in mismatched arm, (includes beyond mask):"+str(np.mean(np.sqrt(self.DM_array.amplitude**2))))
+
+            #_log.debug("Mean RMS OPD error in mismatched arm, (only within mask):"    +str(np.mean(np.sqrt((self.DM_array.mask_array)**2))))
             _log.debug("DM_array plate scale is:"+str(self.DM_array.pixelscale))
            
             wavefront_arm *= self.DM_array
@@ -263,24 +283,24 @@ class NullingCoronagraph(poppy.OpticalSystem):
         except Exception, err:
             _log.warn(err)
             _log.warn("is DM_array defined?")
-        wavefront_arm.wavefront = sheararray(wavefront_arm.wavefront,self.shear) #sheared
+        wavefront_arm.wavefront = sheararray(wavefront_arm.wavefront,self.shear,wavefront_arm.pixelscale) #sheared
         #interfere the arms, accounting for fractional intensity mismatch between the arms: 
-        if self.display_intermediates:
+        '''if self.display_intermediates:
             plt.figure()
-            plt.subplot(221)
+            plt.subplot(121)
             plt.title("Wavefront arm OPD [radians]")
             plt.imshow(wavefront_arm.phase)#*wavefront.wavelength/(2.0*np.pi))
             plt.colorbar()
-            plt.subplot(222)
+            plt.subplot(122)
             plt.title("wavefront arm phase * mask")
             plt.imshow(wavefront_arm.phase*self.mask_array)#*wavefront.wavelength/(2.0*np.pi))
             plt.colorbar()
             plt.figure()
             displaywavefrontarm=wavefront_arm.copy()
             displaywavefrontarm.wavefront=displaywavefrontarm.wavefront*self.mask_array
-            displaywavefrontarm.wavefront=sheararray(displaywavefrontarm.wavefront,-self.shear/2.0)
+            displaywavefrontarm.wavefront=sheararray(displaywavefrontarm.wavefront,-self.shear,displaywavefrontarm.pixelscale)
             displaywavefrontarm.display(what='other',nrows=nrows,row=1, colorbar=True,vmax=wavefront_arm.amplitude.max(),vmin=wavefront_arm.amplitude.min())
-
+        '''
 
         wavefront_combined = 0.5*(1.0 + self.intensity_mismatch)*wavefront.wavefront + 0.5*(-1.0 + self.intensity_mismatch)*wavefront_arm.wavefront
         wavefront_bright.wavefront = 0.5*(1.0 - self.intensity_mismatch)*wavefront.wavefront + 0.5*(1.0 + self.intensity_mismatch)*wavefront_arm.wavefront
@@ -291,25 +311,24 @@ class NullingCoronagraph(poppy.OpticalSystem):
         if self.display_intermediates:
             plt.figure()
             ax=plt.subplot(121)
-            wavefront.display(what='phase',nrows=nrows,row=2, colorbar=True,vmax=wavefront.amplitude.max(),vmin=wavefront.amplitude.min(),ax=ax)
+            wavefront.display(what='phase',nrows=nrows,row=2, colorbar=True,vmax=wavefront.phase.max(),vmin=wavefront.phase.min(),ax=ax)
+            plt.title("output phase")
 
-
+        #recenter arrays, almost:
+        wavefront.wavefront = sheararray(wavefront.wavefront,-self.shear/3.0,wavefront.pixelscale)
+        wavefront_bright.wavefront = sheararray(wavefront_bright.wavefront,-self.shear/3.0,wavefront.pixelscale)
         wavefront.wavefront=wavefront.wavefront*self.mask_array
         wavefront_bright.wavefront=wavefront_bright.wavefront*self.mask_array
-        #recenter arrays, almost:
-        wavefront.wavefront = sheararray(wavefront.wavefront,-self.shear/2.0)
-
-        wavefront_bright.wavefront = sheararray(wavefront_bright.wavefront,-self.shear/2.0)
 
         if  poppy.Conf.enable_flux_tests(): _log.debug("Masked Dark output (wavefront),  Flux === "+str(wavefront.totalIntensity))
         if  poppy.Conf.enable_flux_tests(): _log.debug("Masked Bright output, (wavefront_bright),  Flux === "+str(wavefront_bright.totalIntensity))
         
         #plt.imshow(mask_array)
         if self.display_intermediates:
-            plt.figure()
-            ax=plt.subplot(121)
-            wavefront.display(what='phase',nrows=nrows,row=1, colorbar=True,vmax=wavefront.amplitude.max(),vmin=wavefront.amplitude.min(),ax=ax)
-            ax.set_title("interfered")
+            plt.figure(figsize=[12,6])
+            ax=plt.subplot(111)
+            wavefront.display(what='phase',nrows=nrows,row=1, colorbar=True,vmax=wavefront.amplitude.max(),vmin=wavefront.amplitude.min())#,ax=ax)
+            ax.set_title("interfered Phase")
 
 
         if self.store_pupil:  
