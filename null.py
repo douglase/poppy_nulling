@@ -52,7 +52,7 @@ class NullingCoronagraph(poppy.OpticalSystem):
     display_intermediates:True/False
         Default True
     shear: float
-        The shear between the apertures, (or the baseline as a fraction of primary diameter), Default=0.3
+        The shear between the apertures/pupils, in units of meters, Default=0.3
     nrows: int,
         for plotting. default is 6.
     intensity_mismatch: float
@@ -165,13 +165,14 @@ class NullingCoronagraph(poppy.OpticalSystem):
                         DM_flat=self.phase_flat_fits
                         phase_error=DM_array.opd-DM_flat.opd
                         self.DM_array=poppy.FITSOpticalElement(opd=astropy.io.fits.HDUList(astropy.io.fits.ImageHDU(phase_error)), pixelscale=self.phase_mismatch_meters_pixel,oversample=self.oversample,opdunits='meters',rotation=0)
-                        #self.DM_array.opd= sheararray(self.DM_array.opd,self.shear,self.DM_array.pixelscale)
+                        #self.DM_array.opd= sheararray(self.DM_array.opd,self.shear/2.,self.DM_array.pixelscale)
                     except Exception,err:
                         _log.warn(err)
             else:
                 phase_error=DM_array.opd
                 self.DM_array=poppy.FITSOpticalElement(opd=astropy.io.fits.HDUList(astropy.io.fits.ImageHDU(phase_error)), pixelscale=self.phase_mismatch_meters_pixel,oversample=self.oversample,opdunits='meters',rotation=0)
-                #self.DM_array.opd= sheararray(self.DM_array.opd,self.shear,self.DM_array.pixelscale)
+
+            self.DM_array.opd= sheararray(self.DM_array.opd,-self.shear/2.,self.DM_array.pixelscale)
             _log.debug("initialized:"+str(self.DM_array))
                         
     def null(self,wavelength=0.633e-6,wave_weight=1,flux=1.0,offset_x=0.0,offset_y=0.0,prebuilt_wavefront=False):
@@ -262,10 +263,11 @@ class NullingCoronagraph(poppy.OpticalSystem):
             #print(self.FITSmask.pixelscale)
 
             #offset mask onto the sheared array
-            self.mask_array = self.FITSmask.amplitude# sheararray(self.FITSmask.amplitude,self.shear,self.FITSmask.pixelscale)
+            #self.mask_array = sheararray(self.FITSmask.amplitude,self.shear/2.,self.FITSmask.pixelscale)
+            self.mask_array = self.FITSmask.amplitude#,self.shear/2.,self.FITSmask.pixelscale)
+
             #calculate the effect of phase differences between the arms:
 
-            #center DM on mask:
 
 
         
@@ -315,10 +317,14 @@ class NullingCoronagraph(poppy.OpticalSystem):
             plt.title("output phase")
 
         #recenter arrays, almost:
-        wavefront.wavefront = sheararray(wavefront.wavefront,-self.shear/3.0,wavefront.pixelscale)
-        wavefront_bright.wavefront = sheararray(wavefront_bright.wavefront,-self.shear/3.0,wavefront.pixelscale)
+        
+        wavefront.wavefront = sheararray(wavefront.wavefront,-self.shear/2.0,wavefront.pixelscale)
+        wavefront_bright.wavefront = sheararray(wavefront_bright.wavefront,-self.shear/2.0,wavefront.pixelscale)
+        
         wavefront.wavefront=wavefront.wavefront*self.mask_array
         wavefront_bright.wavefront=wavefront_bright.wavefront*self.mask_array
+        
+
 
         if  poppy.Conf.enable_flux_tests(): _log.debug("Masked Dark output (wavefront),  Flux === "+str(wavefront.totalIntensity))
         if  poppy.Conf.enable_flux_tests(): _log.debug("Masked Bright output, (wavefront_bright),  Flux === "+str(wavefront_bright.totalIntensity))
