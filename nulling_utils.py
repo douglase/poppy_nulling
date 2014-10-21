@@ -17,60 +17,71 @@ from matplotlib.colors import LogNorm, Normalize  # for log scaling of images, w
 from numpy.lib.stride_tricks import as_strided as ast
 
 
-def nullwave(newnuller,wavelength,weight,tiltlist,star_counts,returnBright):
-	'''
-	nullwave nulls a list of targets at a given wavelength. designed for batch processing, i.e. PiCloud.
-	wavelength is in meters.
-	weight is the weight of the wavelength in the stellar spectrum.
-	tiltlist is a np. array of x and y values in arcsec and flux from that coordinate:  np.array([x,y,elementflux*np.ones(npoints)])
-	star_counts is just that, for calculating the central star leakage term.
-	Input tilt list should *not* have a central star.
-	'''
-	t_start = time.time()
-        n_sources=len(tiltlist[0,:])
+
+def add_poisson_noise(photons):
+	'''takes a numpy array of  values and finds a 
+	random number from a poisson distribution centered 
+	on the number of photons in that bin'''
+	from scipy.stats import poisson
 	
-	print("Nulling star, flux"+str(star_counts*weight)+", wavel="+str(wavelength))
-        newnuller.null(offset_x=0,
-		offset_y=0,
-		flux=star_counts*weight,
-		wavelength=wavelength)
-	partial_image=newnuller.wavefront.intensity
-	partial_bright=newnuller.wavefront_bright.intensity
-        refpsf=partial_image
-	image=newnuller.wavefront.intensity
-	bright_output=newnuller.wavefront.intensity
+	vpoisson_rvs=np.vectorize(poisson.rvs) 
 
-
-	for k in range(n_sources):
-		print(k)
-		flux=tiltlist[2,k]
-		if flux == 0:
-			continue
-		print('starting null')
-		#newnuller.null(offset_x=tiltlist[0,k],offset_y=tiltlist[1,k],flux=tiltlist[2,k])
-                weightedflux=tiltlist[2,k]*weight #flux of the source object, times this nuller run's wavelength's weight.
-		newnuller.null(offset_x=tiltlist[0,k],
-			offset_y=tiltlist[1,k],
-			flux=weightedflux,
-			wavelength=wavelength)
-
-		partial_image=newnuller.wavefront.intensity
-		if returnBright:
-			print('stacking bright output')
-			partial_bright = newnuller.wavefront_bright.intensity
-			bright_output = np.sum(np.dstack((bright_output,partial_bright)),axis=2)
-
-		print('stacking dark output-science image')
-		print('max',np.max(partial_image))
-		image=np.sum(np.dstack((image,partial_image)),axis=2)
-		
-
-        print("time to null "+str(n_sources)+ " targets: "+str(time.time()-t_start))
-	if returnBright:
-		return image,bright_output
+	if str(type(input)) == "<class 'astropy.io.fits.hdu.hdulist.HDUList'>":
+		noisy_array=vpoisson_rvs(photons[0].data)
+		noisy = fits.HDUList(fits.PrimaryHDU(data=noisy_array,header=photons[0].header))
 	else:
-		return image
+		noisy=vpoisson_rvs(photons)
+	return noisy
 
+
+def nullwave(newnuller,wavelength,weight,tiltlist,star_counts,returnBright):
+    '''
+    nullwave nulls a list of targets at a given wavelength. designed for batch processing, i.e. PiCloud.
+    wavelength is in meters.
+	weight is the weight of the wavelength in the stellar spectrum.
+    tiltlist is a np. array of x and y values in arcsec and flux from that coordinate:  np.array([x,y,elementflux*np.ones(npoints)])
+    star_counts is just that, for calculating the central star leakage term.
+    Input tilt list should *not* have a central star.
+    '''
+    t_start = time.time()
+    n_sources=len(tiltlist[0,:])
+    print("Nulling star, flux"+str(star_counts*weight)+", wavel="+str(wavelength))
+    newnuller.null(offset_x=0,
+                    offset_y=0,
+                    flux=star_counts*weight,
+                    wavelength=wavelength)
+    partial_image=newnuller.wavefront.intensity
+    partial_bright=newnuller.wavefront_bright.intensity
+    refpsf=partial_image
+    image=newnuller.wavefront.intensity
+    bright_output=newnuller.wavefront.intensity
+    for k in range(n_sources):
+        print(k)
+        flux=tiltlist[2,k]
+        if flux == 0:
+            continue
+        print('starting null')
+        #newnuller.null(offset_x=tiltlist[0,k],offset_y=tiltlist[1,k],flux=tiltlist[2,k])
+        weightedflux=tiltlist[2,k]*weight #flux of the source object, times this nuller run's wavelength's weight.
+        newnuller.null(offset_x=tiltlist[0,k],
+                offset_y=tiltlist[1,k],
+                flux=weightedflux,
+                wavelength=wavelength)
+        partial_image=newnuller.wavefront.intensity
+        print("total counts",newnuller.wavefront.totalIntensity)
+        if returnBright:
+            print('stacking bright output')
+            partial_bright = newnuller.wavefront_bright.intensity
+            bright_output = np.sum(np.dstack((bright_output,partial_bright)),axis=2)
+
+        print('stacking dark output-science image')
+        print('max',np.max(partial_image))
+        image=np.sum(np.dstack((image,partial_image)),axis=2)
+        print("time to null "+str(n_sources)+ " targets: "+str(time.time()-t_start))
+    if returnBright:
+        return image,bright_output
+    else:
+        return image
 
 def add_nuller_to_header(primaryHDU,nuller):
 	'''
@@ -551,3 +562,15 @@ def congrid(a, newdims, method='linear', centre=False, minusone=False):
               "Currently only \'neighbour\', \'nearest\',\'linear\',", \
               "and \'spline\' are supported."
         return None
+
+
+
+
+
+def halfcircularTiltList(r,totalflux,npoints,phase=0):
+	''' draws a circle of radius r in cartesian coordinates.
+	'''
+	elementflux=totalflux/float(npoints)
+	x=r*np.sin(np.arange(npoints)*6.28/npoints+phase)
+	y=r*np.cos(np.arange(npoints)*6.28/npoints+phase)
+	return np.array([x,y,elementflux*np.ones(npoints)])
