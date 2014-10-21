@@ -375,7 +375,7 @@ class NullingCoronagraph(poppy.OpticalSystem):
 		ax3.set_title("Oversampled Pupil Intensity Map [$log_{10}$(counts)]")
 		ax3.imshow(np.log10(wavefront.intensity))#wavefront.wavelength*/(2*np.pi))
 		plt.colorbar(ax3.images[0])
-		#suptitle.remove() #  does not work due to some matplotlib limitation, so work arount:
+		#suptitle.remove() #  does not work due to some matplotlib limitation, so work around:
 		suptitle.set_text('') # clean up before next iteration to avoid ugly overwriting
         '''
         wavefront.propagateTo(self.detector)

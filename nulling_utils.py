@@ -46,10 +46,7 @@ def nullwave(newnuller,wavelength,weight,tiltlist,star_counts,returnBright):
     t_start = time.time()
     n_sources=len(tiltlist[0,:])
     print("Nulling star, flux"+str(star_counts*weight)+", wavel="+str(wavelength))
-    newnuller.null(offset_x=0,
-                    offset_y=0,
-                    flux=star_counts*weight,
-                    wavelength=wavelength)
+    newnuller.null(flux=star_counts*weight,wavelength=wavelength)
     partial_image=newnuller.wavefront.intensity
     partial_bright=newnuller.wavefront_bright.intensity
     refpsf=partial_image
