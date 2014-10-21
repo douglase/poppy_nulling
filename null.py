@@ -24,6 +24,19 @@ poppy.Conf.use_fftw.set(True)
 poppy.Conf.enable_speed_tests.set(True)
 poppy.Conf.autosave_fftw_wisdom.set(True)
 def sheararray(inputarray,shear,pixelscale):
+    """
+    Inputs:
+    inputarray - a numpy array
+    shear - a shear in units of pixel scale
+    pixel scale - units of length per pixel (i.e. meters per pixel)
+
+    Returns:
+    an array rolled by the distance shear
+    
+    Example:
+    wavefront_arm.wavefront = sheararray(wavefront_arm.wavefront,self.shear,wavefront_arm.pixelscale) #sheared
+
+    """
     npix_shear=np.int64(np.round(shear/pixelscale))
     _log.debug("shearing by %3f pixels"%npix_shear)
     sheared = np.roll(inputarray,npix_shear)
@@ -212,8 +225,8 @@ class NullingCoronagraph(poppy.OpticalSystem):
             wavefront *= self.defocus
         wavefront.normalize()
         wavefront *= np.sqrt(flux)
-        _log.debug("Normalized all planes, after the unobscured aperture, then multiplied by incident flux %s",str(flux))
-        if  poppy.Conf.enable_flux_tests(): _log.debug("Wavefront multiplied by flux,  Flux === "+str(wavefront.totalIntensity))
+        _log.debug("Normalized all planes, after the unobscured aperture, then multiplied by flux/aperture %s",str(flux))
+        if  poppy.Conf.enable_flux_tests(): _log.debug("Wavefront multiplied by flux/aperture,  total intensity === "+str(wavefront.totalIntensity))
         if self.obscuration_fname:
             self.obscuration=poppy.FITSOpticalElement(transmission=self.obscuration_fname,
                                 pixelscale=self.phase_mismatch_meters_pixel,
@@ -244,7 +257,8 @@ class NullingCoronagraph(poppy.OpticalSystem):
             mask_array[np.where(mask < 1)]=0
             #force area wrapped back over the leading edge to zero:
             mask_array[:,0:int(round(self.shear/wavefront.pixelscale))]=0
-            self.mask_array = mask_array
+            #recenter:
+            self.mask_array = sheararray(mask_array,-self.shear/2.0,wavefront.pixelscale)
 
         else:
 
@@ -278,7 +292,8 @@ class NullingCoronagraph(poppy.OpticalSystem):
 
             #_log.debug("Mean RMS OPD error in mismatched arm, (only within mask):"    +str(np.mean(np.sqrt((self.DM_array.mask_array)**2))))
             _log.debug("DM_array plate scale is:"+str(self.DM_array.pixelscale))
-           
+            _log.debug("DM_array shape is:"+str(self.DM_array.amplitude.shape))
+
             wavefront_arm *= self.DM_array
             _log.debug("RMS phase error [radians] in mismatched arm:"+str(np.mean(np.sqrt(wavefront_arm.phase**2))))
 
@@ -320,7 +335,7 @@ class NullingCoronagraph(poppy.OpticalSystem):
         
         wavefront.wavefront = sheararray(wavefront.wavefront,-self.shear/2.0,wavefront.pixelscale)
         wavefront_bright.wavefront = sheararray(wavefront_bright.wavefront,-self.shear/2.0,wavefront.pixelscale)
-        
+
         wavefront.wavefront=wavefront.wavefront*self.mask_array
         wavefront_bright.wavefront=wavefront_bright.wavefront*self.mask_array
         
