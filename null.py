@@ -221,8 +221,7 @@ class NullingCoronagraph(poppy.OpticalSystem):
             #plt.clf()
             #wavefront.display(what='intensity',nrows=nrows,row=1, colorbar=False)
             wavefront *= self.inputpupil
-        if self.defocus:
-            wavefront *= self.defocus
+   
         wavefront.normalize()
         wavefront *= np.sqrt(flux)
         _log.debug("Normalized all planes, after the unobscured aperture, then multiplied by flux/aperture %s",str(flux))
@@ -336,6 +335,10 @@ class NullingCoronagraph(poppy.OpticalSystem):
         wavefront.wavefront = sheararray(wavefront.wavefront,-self.shear/2.0,wavefront.pixelscale)
         wavefront_bright.wavefront = sheararray(wavefront_bright.wavefront,-self.shear/2.0,wavefront.pixelscale)
 
+        
+        if self.defocus:
+            wavefront *= self.defocus
+        
         wavefront.wavefront=wavefront.wavefront*self.mask_array
         wavefront_bright.wavefront=wavefront_bright.wavefront*self.mask_array
         
@@ -355,6 +358,7 @@ class NullingCoronagraph(poppy.OpticalSystem):
         if self.store_pupil:  
             self.pupil_plane_dark=wavefront.wavefront.copy()     
             self.pupil_dm_arm=wavefront_arm.wavefront
+
         '''
 	if self.display_intermediates:
 		intens = wavefront.intensity.copy()
