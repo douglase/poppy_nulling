@@ -338,7 +338,7 @@ class NullingCoronagraph(poppy.OpticalSystem):
         
         if self.defocus:
             wavefront *= self.defocus
-        
+            wavefront_bright *= self.defocus
         wavefront.wavefront=wavefront.wavefront*self.mask_array
         wavefront_bright.wavefront=wavefront_bright.wavefront*self.mask_array
         
