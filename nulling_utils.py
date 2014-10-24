@@ -51,7 +51,7 @@ def nullwave(newnuller,wavelength,weight,tiltlist,star_counts,returnBright):
     partial_bright=newnuller.wavefront_bright.intensity
     refpsf=partial_image
     image=newnuller.wavefront.intensity
-    bright_output=newnuller.wavefront.intensity
+    bright_output=newnuller.wavefront_bright.intensity
     for k in range(n_sources):
         print(k)
         flux=tiltlist[2,k]
