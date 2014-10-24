@@ -17,6 +17,12 @@ from matplotlib.colors import LogNorm, Normalize  # for log scaling of images, w
 from numpy.lib.stride_tricks import as_strided as ast
 
 
+import matplotlib.pyplot as plt
+    
+from mpl_toolkits.axes_grid1.inset_locator import zoomed_inset_axes
+from mpl_toolkits.axes_grid1.inset_locator import mark_inset
+    
+import numpy as np
 
 def add_poisson_noise(photons):
 	'''takes a numpy array of  values and finds a 
@@ -396,7 +402,7 @@ def InputWavefrontFromField(inwave,field,arcsec_per_pixel,zero_init_wavefront=Tr
     inwave.display(what='other',nrows=2,row=1, colorbar=True)
     return inwave
 
-def display_inset(inFITS,x1, x2, y1, y2,zoom=2.0,title="",suppressinset=False,**kwargs):
+def display_inset(inFITS,x1, x2, y1, y2,zoom=2.0,title="",suppressinset=False,figsize=[7,5],**kwargs):
     '''
     displays the first array of the FITS hdulist inFITS and a zoomed inset of the subregion defined by the  [x1:x2,y1:y2] 
     where x1 etc... are in display units (arc seconds) not pixels number.
@@ -407,15 +413,8 @@ def display_inset(inFITS,x1, x2, y1, y2,zoom=2.0,title="",suppressinset=False,**
     http://matplotlib.org/mpl_toolkits/axes_grid/users/overview.html#insetlocator
     '''
 
-    import matplotlib.pyplot as plt
 
-    from mpl_toolkits.axes_grid1.inset_locator import zoomed_inset_axes
-    from mpl_toolkits.axes_grid1.inset_locator import mark_inset
-
-    import numpy as np
-
-
-    fig, ax = plt.subplots(figsize=[6,5])
+    fig, ax = plt.subplots(figsize=figsize)
     
     # prepare the demo image
     Z = inFITS[0].data
