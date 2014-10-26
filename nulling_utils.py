@@ -234,17 +234,22 @@ def find_annular_profiles(HDUlist_or_filename=None,
         size of step for profile. Default is pixel size.
     stddev : bool
         Compute standard deviation in each radial bin, not average?
-    weights : weight array, same dimensions as input array in fits[ext]
+    weights :weight array, same dimensions as input array in fits[ext]
 
     Returns
     --------
     results : Dict
-        'rr':        The radius gives the center radius of each bin.
-         The EE is given inside the whole bin so you should use (radius+binsize/2) for the radius of the EE curve if you want to be
-        as precise as possible.
-        annularvals, array of arrays of values at each radius.
-           standard deviation at each radius
-            'weight_avg':weighted_avg at each radius.
+        'rr':        The radius gives the center radius of each bin (in arcseconds'.
+        'mean': the unweighted average of the counts within the annular bin.
+        'EE': The EE is given inside the whole bin so you should use (radius+binsize/2)
+          for the radius of the EE curve if you want to be as precise as possible.
+        'annularvals': array of arrays of values at each radius.
+        'stddevs': standard deviation at each radius
+        'weight_avg':weighted_avg at each radius.
+        'weighted std': weighted standard deviation from 'biased variance' which may underestimate the
+        true variance
+        (from http://stackoverflow.com/a/2415343/2142498, same as default of np.std
+        (http://docs.scipy.org/doc/numpy/reference/generated/numpy.std.html))
     """
     if isinstance(HDUlist_or_filename, str):
         HDUlist = fits.open(HDUlist_or_filename)
@@ -307,7 +312,7 @@ def find_annular_profiles(HDUlist_or_filename=None,
         stddevs[i] = image[wg].std()
         if weights[wg].sum()>0:
             weighted_avg[i]=np.average(image[wg],weights=weights[wg])
-            # standard deviation from 'biased variance' (http://stackoverflow.com/a/2415343/2142498):
+
             weighted_std[i] = np.sqrt(np.average((image[wg]- weighted_avg[i])**2, weights=weights[wg]))
         annularvals.append(image[wg])  
 
