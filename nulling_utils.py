@@ -207,10 +207,9 @@ def downsample(A, block= (2,2), subarr=False):
 def find_annular_profiles(HDUlist_or_filename=None,
 			  ext=0, EE=False, center=None,
 			  stddev=False, binsize=None,
-			  maxradius=None):
+			  maxradius=None,weights=None):
     """
-    Hack of poppy.utils.radial_profile adding an array of annular values when STDDEV=True,
-    that is (radial bins in arcseconds, sttdev of bins, arrays of values in those bins)
+    Hack of poppy.utils.radial_profile
     """
 
 
@@ -235,15 +234,17 @@ def find_annular_profiles(HDUlist_or_filename=None,
         size of step for profile. Default is pixel size.
     stddev : bool
         Compute standard deviation in each radial bin, not average?
-
+    weights : weight array, same dimensions as input array in fits[ext]
 
     Returns
     --------
-    results : tuple
-        Tuple containing (radius, profile) or (radius, profile, EE) depending on what is requested.
-        The radius gives the center radius of each bin, while the EE is given inside the whole bin
-        so you should use (radius+binsize/2) for the radius of the EE curve if you want to be
+    results : Dict
+        'rr':        The radius gives the center radius of each bin.
+         The EE is given inside the whole bin so you should use (radius+binsize/2) for the radius of the EE curve if you want to be
         as precise as possible.
+        annularvals, array of arrays of values at each radius.
+           standard deviation at each radius
+            'weight_avg':weighted_avg at each radius.
     """
     if isinstance(HDUlist_or_filename, str):
         HDUlist = fits.open(HDUlist_or_filename)
@@ -291,27 +292,33 @@ def find_annular_profiles(HDUlist_or_filename=None,
     radialprofile2[1:] = radialprofile
     rr = np.arange(len(radialprofile2))*binsize + binsize*0.5  # these should be centered in the bins, so add a half.
 
-    if stddev:
-        stddevs = np.zeros_like(radialprofile2)
-        r_pix = r * binsize
-        for i, radius in enumerate(rr):
-		if i == 0: wg = np.where(r < radius+ binsize/2)
-		else: 
-			wg = np.where( (r_pix >= (radius-binsize/2)) &  (r_pix < (radius+binsize/2)))
-			#print radius-binsize/2, radius+binsize/2, len(wg[0])
-			#wg = np.where( (r >= rr[i-1]) &  (r <rr[i] )))
-		
-		stddevs[i] = image[wg].std()
-		annularvals.append(image[wg])
-        return (rr, stddevs,annularvals)
+ 
+    stddevs = np.zeros_like(radialprofile2)
+    weighted_avg = np.zeros_like(radialprofile2)
+    weighted_std = np.zeros_like(radialprofile2)
+    r_pix = r * binsize
+    for i, radius in enumerate(rr):
+        if i == 0: wg = np.where(r < radius+ binsize/2)
+        else: 
+            wg = np.where( (r_pix >= (radius-binsize/2)) &  (r_pix < (radius+binsize/2)))
+            #print radius-binsize/2, radius+binsize/2, len(wg[0])
+            #wg = np.where( (r >= rr[i-1]) &  (r <rr[i] )))
+        #print(wg)
+        stddevs[i] = image[wg].std()
+        if weights[wg].sum()>0:
+            weighted_avg[i]=np.average(image[wg],weights=weights[wg])
+            # standard deviation from 'biased variance' (http://stackoverflow.com/a/2415343/2142498):
+            weighted_std[i] = np.sqrt(np.average((image[wg]- weighted_avg[i])**2, weights=weights[wg]))
+        annularvals.append(image[wg])  
 
-    if not EE:
-        return (rr, radialprofile2)
-    else:
-        #weighted_profile = radialprofile2*2*np.pi*(rr/rr[1])
-        #EE = np.cumsum(weighted_profile)
-        EE = csim[rind]
-        return (rr, radialprofile2, EE) 
+    EE = csim[rind]
+    return {'rr':rr,
+            'mean':radialprofile2,
+            'EE':EE,
+            'annularvals':annularvals,
+            'stddevs':stddevs,
+            'weighted_avg':weighted_avg,
+            'weighted_std':weighted_std}
 
 
 def downsample_display(input,block=(10,10),
