@@ -17,13 +17,6 @@ from matplotlib.colors import LogNorm, Normalize  # for log scaling of images, w
 from numpy.lib.stride_tricks import as_strided as ast
 
 
-import matplotlib.pyplot as plt
-    
-from mpl_toolkits.axes_grid1.inset_locator import zoomed_inset_axes
-from mpl_toolkits.axes_grid1.inset_locator import mark_inset
-    
-import numpy as np
-
 def add_poisson_noise(photons):
 	'''takes a numpy array of  values and finds a 
 	random number from a poisson distribution centered 
@@ -416,6 +409,7 @@ def InputWavefrontFromField(inwave,field,arcsec_per_pixel,zero_init_wavefront=Tr
 
 def display_inset(inFITS,x1, x2, y1, y2,zoom=2.0,title="",suppressinset=False,figsize=[7,5],**kwargs):
     '''
+    
     displays the first array of the FITS hdulist inFITS and a zoomed inset of the subregion defined by the  [x1:x2,y1:y2] 
     where x1 etc... are in display units (arc seconds) not pixels number.
     
@@ -424,7 +418,7 @@ def display_inset(inFITS,x1, x2, y1, y2,zoom=2.0,title="",suppressinset=False,fi
     using example from:
     http://matplotlib.org/mpl_toolkits/axes_grid/users/overview.html#insetlocator
     '''
-
+ 
 
     fig, ax = plt.subplots(figsize=figsize)
     
@@ -433,15 +427,13 @@ def display_inset(inFITS,x1, x2, y1, y2,zoom=2.0,title="",suppressinset=False,fi
     Z2 = Z
     halffov_x = inFITS[0].header['PIXELSCL']*inFITS[0].data.shape[1]/2.0
     halffov_y = inFITS[0].header['PIXELSCL']*inFITS[0].data.shape[0]/2.0
+    ax.set_title(title)
     extent = [-halffov_x, halffov_x, -halffov_y, halffov_y]
-    extent = [-12, 12, -12, 12]
+    ax.set_xlim([-halffov_x, halffov_x])
     ax.imshow(Z, extent=extent, interpolation="none",
               origin="lower",cmap='gist_heat',**kwargs)
     ax.set_xlabel("Arcseconds",fontsize=16)
     ax.set_ylabel("Arcseconds",fontsize=16)
-    ax.set_title(title)
-    ax.set_xlim([-8,8])
-    ax.set_ylim([-8,8])
     axins = zoomed_inset_axes(ax, zoom, loc=1) # zoom = 6
     if suppressinset==False:
         axins.imshow(np.array(Z2), extent=extent, interpolation="none",origin="lower",cmap='gist_heat',**kwargs)
@@ -459,13 +451,14 @@ def display_inset(inFITS,x1, x2, y1, y2,zoom=2.0,title="",suppressinset=False,fi
     cax = fig.add_axes([0.88, 0.05, 0.05, 0.9])
     cax.set_title("Counts",size=12)
     cax.tick_params(labelsize=12)
+    plt.colorbar(ax.images,cax=cax) 
     plt.colorbar(ax.images[0],cax=cax) 
     plt.setp(ax.spines.values(), color='white')
     plt.setp([ax.get_xticklines(), ax.get_yticklines()], color='white')
     ax.tick_params(labelsize=16)
         # draw a bbox of the region of the inset axes in the parent axes and
         # connecting lines between the bbox and the inset axes area
-    fig.tight_layout()
+    #fig.tight_layout()
 
 def congrid(a, newdims, method='linear', centre=False, minusone=False):
     '''
