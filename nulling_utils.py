@@ -97,10 +97,13 @@ def add_nuller_to_header(primaryHDU,nuller):
 def TiltfromField(field,arcsec_per_pixel,zero_init_wavefront=True):
 	'''
 	takes a numpy array of flux values and returns a list of x and y offsets (in arcsec) and  flux values.
+
+    The image center is defined as half the number of pixels in the array.
+    The flux from each pixel is taken as coming from the center of the pixel.
 	'''
 	
-	center=int(np.round(np.shape(field)[0]/2.0))
-	center_y=int(np.round(np.shape(field)[1]/2.0))
+	center_x = np.shape(field)[0]/2.0
+	center_y = np.shape(field)[1]/2.0
 
 	npix=field.shape[0]
 
@@ -110,12 +113,12 @@ def TiltfromField(field,arcsec_per_pixel,zero_init_wavefront=True):
 	
 	for index in range(points.shape[1]):
 		point=((points[0,index]),(points[1,index]))
-		i=point[0]
-		j=point[1]
+		i=point[0]+0.5
+		j=point[1]+0.5
 		flux=field[point]
 		tiltlist[2,index]=flux
-		r_pixel=arcsec_per_pixel*np.sqrt((i-center)**2+(j-center_y)**2) #arcsec
-		angle=np.angle(complex((j-center_y),(i-center))) #radians.
+		r_pixel=arcsec_per_pixel*np.sqrt((i-center_x)**2+(j-center_y)**2) #arcsec
+		angle=np.angle(complex((j-center_y),(i-center_x))) #radians.
 		offset_x = r_pixel *-np.sin(angle)  # convert to offset X,Y in arcsec
 		offset_y = r_pixel * np.cos(angle)  # using the usual astronomical angle convention
 		tiltlist[0,index]=offset_x
@@ -451,7 +454,6 @@ def display_inset(inFITS,x1, x2, y1, y2,zoom=2.0,title="",suppressinset=False,fi
     cax = fig.add_axes([0.88, 0.05, 0.05, 0.9])
     cax.set_title("Counts",size=12)
     cax.tick_params(labelsize=12)
-    plt.colorbar(ax.images,cax=cax) 
     plt.colorbar(ax.images[0],cax=cax) 
     plt.setp(ax.spines.values(), color='white')
     plt.setp([ax.get_xticklines(), ax.get_yticklines()], color='white')
