@@ -86,18 +86,20 @@ def nullwave(newnuller,wavelength,weight,tiltlist,star_counts,returnBright):
     else:
         return image
 
-def add_nuller_to_header(primaryHDU,nuller):
-	'''
-	takes a FITS HDU and appends important nuller charactaristics.
-	'''
-	
-	primaryHDU.header['PIXELSCL']=nuller.wavefront.asFITS()[0].header['PIXELSCL']
-	primaryHDU.header.update("shear",str(nuller.shear))
-	primaryHDU.header.update('hierarch phase mismatch',str(nuller.phase_mismatch_fits))
-	primaryHDU.header.update('hierarch phase flat field (DM correction)',str(nuller.phase_flat_fits))
-	primaryHDU.header.update('hierarch Intensity Mismatch',str(nuller.intensity_mismatch))
-	primaryHDU.header.update('hierarch mask',str(nuller.pupilmask))
-	primaryHDU.header.add_history('hierarch name: '+str(nuller.name))
+def add_nuller_to_header(primaryHDUList,nuller):
+    '''
+    takes a FITS HDU and appends important nuller charactaristics.
+    '''
+    primaryHDUList[0].header['PIXELSCL']=nuller.wavefront.asFITS()[0].header['PIXELSCL']
+    primaryHDUList[0].header.add_history("shear: "+str(nuller.shear))
+    primaryHDUList[0].header.add_history(str(nuller.phase_mismatch_fits))
+    primaryHDUList[0].header.add_history(str(nuller.phase_flat_fits))
+    primaryHDUList[0].header.add_history(str(nuller.pupilmask))
+    primaryHDUList[0].header.add_history(str(nuller.name))
+    if nuller.defocus:
+        primaryHDUList[0].header["OPD_PV"]=str(np.abs(nuller.defocus.opd.max())+np.abs(nuller.defocus.opd.min()))
+    else:
+        primaryHDUList[0].header["OPD_PV"]=str(0)
 
 	#return primaryHDU
 	
@@ -154,6 +156,14 @@ def draw_circle(r,dr,amp,cube=False):
 	#
 	array=array/num_targ
 	return array
+
+def halfcircularTiltList(r,totalflux,npoints,phase=0):
+	''' draws a circle of radius r in cartesian coordinates.
+	'''
+	elementflux=totalflux/float(npoints)
+	x=r*np.sin(np.arange(npoints)*6.28/npoints+phase)
+	y=r*np.cos(np.arange(npoints)*6.28/npoints+phase)
+	return np.array([x,y,elementflux*np.ones(npoints)])
 
 def downsample(A, block= (2,2), subarr=False):
     '''
@@ -555,30 +565,16 @@ def congrid(a, newdims, method='linear', centre=False, minusone=False):
         newcoords_dims.append(newcoords_dims.pop(0))
         newcoords_tr = newcoords.transpose(newcoords_dims)
         # makes a view that affects newcoords
-
+        # makes a view that affects newcoords
         newcoords_tr += ofs
-
         deltas = (np.asarray(old) - m1) / (newdims - m1)
         newcoords_tr *= deltas
-
         newcoords_tr -= ofs
-
         newa = scipy.ndimage.map_coordinates(a, newcoords)
         return newa
     else:
         print "Congrid error: Unrecognized interpolation type.\n", \
-              "Currently only \'neighbour\', \'nearest\',\'linear\',", \
-              "and \'spline\' are supported."
+          "Currently only \'neighbour\', \'nearest\',\'linear\',", \
+          "and \'spline\' are supported."
         return None
-
-
-
-
-
-def halfcircularTiltList(r,totalflux,npoints,phase=0):
-	''' draws a circle of radius r in cartesian coordinates.
-	'''
-	elementflux=totalflux/float(npoints)
-	x=r*np.sin(np.arange(npoints)*6.28/npoints+phase)
-	y=r*np.cos(np.arange(npoints)*6.28/npoints+phase)
-	return np.array([x,y,elementflux*np.ones(npoints)])
+    
