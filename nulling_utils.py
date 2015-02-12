@@ -79,6 +79,22 @@ def nullwave(newnuller,wavelength,weight,tiltlist,star_counts,returnBright):
     else:
         return image
 
+def nulltilt(newnuller,wavelength,offset_x,offset_y,flux,returnNuller):
+    '''
+    null given a tilted wavefront at a particular wavelength
+    '''
+    newnuller.null(offset_x=offset_x,
+                offset_y=offset_y,
+                flux=flux,
+                wavelength=wavelength)
+    image=newnuller.wavefront.intensity
+    bright_output=newnuller.wavefront_bright.intensity
+
+    if returnNuller:
+        return newnuller
+    else:
+        return image
+
 def add_nuller_to_header(primaryHDUList,nuller):
     '''
     takes a FITS HDU and appends important nuller charactaristics.
@@ -96,7 +112,7 @@ def add_nuller_to_header(primaryHDUList,nuller):
 
 	#return primaryHDU
 	
-def TiltfromField(field,arcsec_per_pixel,zero_init_wavefront=True):
+def TiltfromField(field,arcsec_per_pixel):
 	'''
 	takes a numpy array of flux values and returns a list of x and y offsets (in arcsec) and  flux values.
 
