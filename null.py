@@ -318,8 +318,8 @@ class NullingCoronagraph(poppy.OpticalSystem):
             displaywavefrontarm.display(what='other',nrows=nrows,row=1, colorbar=True,vmax=wavefront_arm.amplitude.max(),vmin=wavefront_arm.amplitude.min())
         '''
 
-        wavefront_combined = 0.5*(1.0 + self.intensity_mismatch)*wavefront.wavefront + 0.5*(-1.0 + self.intensity_mismatch)*wavefront_arm.wavefront
-        wavefront_bright.wavefront = 0.5*(1.0 - self.intensity_mismatch)*wavefront.wavefront + 0.5*(1.0 + self.intensity_mismatch)*wavefront_arm.wavefront
+        wavefront_combined = ( 0.5*(1.0 + self.intensity_mismatch/2.0)*wavefront.wavefront + 0.5*(-1.0 + self.intensity_mismatch/2.0)*wavefront_arm.wavefront)
+        wavefront_bright.wavefront =( 0.5*(1.0 - self.intensity_mismatch/2.0)*wavefront.wavefront + 0.5*(1.0 + self.intensity_mismatch/2.0)*wavefront_arm.wavefront)
 
         wavefront.wavefront=wavefront_combined
 
@@ -398,3 +398,14 @@ class NullingCoronagraph(poppy.OpticalSystem):
     # self.pupil_plane_dark =	wavefront.copy()
 
 
+    def measure_null(self,function=np.max):
+        if self.nullerstatus is False:
+            self.null()
+        dark = self.wavefront.intensity
+        bright = self.wavefront_bright.intensity
+        null_image_flat_2D_dm = dark/np.max(bright,axis=0)
+        nulldepth = function(dark)/function(bright)
+        plt.imshow(np.log10(null_image_flat_2D_dm), interpolation='none')
+        plt.colorbar()
+        plt.title("N=%.2e"%nulldepth)
+        return nulldepth
