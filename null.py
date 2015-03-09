@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import matplotlib
 import logging
 import numpy as np
-import astropy
+import astropy.convolution
 import time
 
 _log = logging.getLogger('poppy')
@@ -23,6 +23,7 @@ _typestrs = ['', 'Pupil plane', 'Image plane', 'Detector', 'Rotation']
 poppy.Conf.use_fftw.set(True)
 poppy.Conf.enable_speed_tests.set(True)
 poppy.Conf.autosave_fftw_wisdom.set(True)
+
 def sheararray(inputarray,shear,pixelscale):
     """
     Inputs:
@@ -41,6 +42,15 @@ def sheararray(inputarray,shear,pixelscale):
     _log.debug("shearing by %3f pixels"%npix_shear)
     sheared = np.roll(inputarray,npix_shear)
     return sheared
+
+def err_smooth_opd(wavef,kernel):
+    '''
+    corrects wavefront error by convolving with kernel and returning the difference
+    '''
+    
+    dPhi=(wavef.phase)
+    err= astropy.convolution.convolve_fft(dPhi,kernel)
+    return err
 
 class NullingCoronagraph(poppy.OpticalSystem):
     print('nulling class')
@@ -96,7 +106,8 @@ class NullingCoronagraph(poppy.OpticalSystem):
         phase_mismatch_fits=False,
         phase_mismatch_meters_pixel=0, phase_flat_fits=False,
         obscuration_fname=False,
-        pupilmask=False,verbose=True,defocus=False,store_pupil=False):
+        pupilmask=False,verbose=True,defocus=False,store_pupil=False,
+        feedback=False,feedback_function,feedback_kernel):
 
         self.phase_mismatch_fits=phase_mismatch_fits
         self.pupilmask=pupilmask
@@ -126,8 +137,9 @@ class NullingCoronagraph(poppy.OpticalSystem):
             print(err)
         self.oversample = oversample
         self.store_pupil=store_pupil
-
-        
+        self.feedback=feedback
+        self.feedback_function=feedback_function
+        self.feeback_kernel=feedback_kernel
         if self.phase_mismatch_fits:
             self.init_wfe_error()
     def init_wfe_error(self):
@@ -187,7 +199,10 @@ class NullingCoronagraph(poppy.OpticalSystem):
 
             self.DM_array.opd= sheararray(self.DM_array.opd,-self.shear/2.,self.DM_array.pixelscale)
             _log.debug("initialized:"+str(self.DM_array))
-                        
+
+    def get_chromatic_shift(self,wavel):
+        raise ValueError("not yet implemented")
+    
     def null(self,wavelength=0.633e-6,wave_weight=1,flux=1.0,offset_x=0.0,offset_y=0.0,prebuilt_wavefront=False):
         '''
         nulls the Nulling Coronagraph according to the optical system prescription.
@@ -317,10 +332,13 @@ class NullingCoronagraph(poppy.OpticalSystem):
             displaywavefrontarm.wavefront=sheararray(displaywavefrontarm.wavefront,-self.shear,displaywavefrontarm.pixelscale)
             displaywavefrontarm.display(what='other',nrows=nrows,row=1, colorbar=True,vmax=wavefront_arm.amplitude.max(),vmin=wavefront_arm.amplitude.min())
         '''
+        if self.store_pupil:  
+            self.pupil_plane_raw = wavefront.copy()     
+            self.pupil_plane_umasked_dm_arm = wavefront_arm.copy()
 
+ 
         wavefront_combined = ( 0.5*(1.0 + self.intensity_mismatch/2.0)*wavefront.wavefront + 0.5*(-1.0 + self.intensity_mismatch/2.0)*wavefront_arm.wavefront)
         wavefront_bright.wavefront =( 0.5*(1.0 - self.intensity_mismatch/2.0)*wavefront.wavefront + 0.5*(1.0 + self.intensity_mismatch/2.0)*wavefront_arm.wavefront)
-
         wavefront.wavefront=wavefront_combined
 
         #plt.imshow(mask_array)
@@ -342,7 +360,13 @@ class NullingCoronagraph(poppy.OpticalSystem):
         wavefront.wavefront=wavefront.wavefront*self.mask_array
         wavefront_bright.wavefront=wavefront_bright.wavefront*self.mask_array
         
-
+        
+        if feedback:
+            self.dark_error = self.feedback_function(wavefront_combined,kernel=self.feedback_kernel)
+            self.bright_error = self.feedback_function(wavefront_bright,kernel=self.feedback_kernel)
+            wavefront_combined = wavefront_combined - self.dark_error
+            wavefront_bright = wavefront_bright - self.bright_error
+            
 
         if  poppy.Conf.enable_flux_tests(): _log.debug("Masked Dark output (wavefront),  Flux === "+str(wavefront.totalIntensity))
         if  poppy.Conf.enable_flux_tests(): _log.debug("Masked Bright output, (wavefront_bright),  Flux === "+str(wavefront_bright.totalIntensity))
@@ -356,9 +380,8 @@ class NullingCoronagraph(poppy.OpticalSystem):
 
 
         if self.store_pupil:  
-            self.pupil_plane_dark=wavefront.wavefront.copy()     
-            self.pupil_dm_arm=wavefront_arm.wavefront
-
+            self.pupil_plane_interferred = wavefront.copy()     
+            
         '''
 	if self.display_intermediates:
 		intens = wavefront.intensity.copy()
@@ -409,3 +432,4 @@ class NullingCoronagraph(poppy.OpticalSystem):
         plt.colorbar()
         plt.title("N=%.2e"%nulldepth)
         return nulldepth
+
