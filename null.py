@@ -399,14 +399,22 @@ class NullingCoronagraph(poppy.OpticalSystem):
     # self.pupil_plane_dark =	wavefront.copy()
 
 
-    def measure_null(self,function=np.max):
+    def measure_null(self,function=np.max,ax=None,**kwargs):
+        '''
+        measure and plot null depth as
+        N=function(dark_output)/ function(bright_output).
+        
+        '''
+        
+        if ax is None:
+            fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(6,6))
         if self.nullerstatus is False:
             self.null()
         dark = self.wavefront.intensity
         bright = self.wavefront_bright.intensity
-        null_image_flat_2D_dm = dark/np.max(bright,axis=0)
-        nulldepth = function(dark)/function(bright)
-        plt.imshow(np.log10(null_image_flat_2D_dm), interpolation='none')
-        plt.colorbar()
-        plt.title("N=%.2e"%nulldepth)
+        null_image_flat_2D_dm = dark/function(bright,**kwargs)
+        nulldepth = function(dark)/function(bright,**kwargs)
+        im=ax.imshow(np.log10(null_image_flat_2D_dm), interpolation='none')
+        plt.colorbar(im)
+        ax.set_title("N=%.2e"%nulldepth)
         return nulldepth
