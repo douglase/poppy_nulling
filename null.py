@@ -318,8 +318,9 @@ class NullingCoronagraph(poppy.OpticalSystem):
             displaywavefrontarm.display(what='other',nrows=nrows,row=1, colorbar=True,vmax=wavefront_arm.amplitude.max(),vmin=wavefront_arm.amplitude.min())
         '''
 
-        wavefront_combined = ( 0.5*(1.0 + self.intensity_mismatch/2.0)*wavefront.wavefront + 0.5*(-1.0 + self.intensity_mismatch/2.0)*wavefront_arm.wavefront)
-        wavefront_bright.wavefront =( 0.5*(1.0 - self.intensity_mismatch/2.0)*wavefront.wavefront + 0.5*(1.0 + self.intensity_mismatch/2.0)*wavefront_arm.wavefront)
+        
+        wavefront_combined = 0.5*(1.0 - self.intensity_mismatch)*wavefront.wavefront + 0.5*(-1.0)*wavefront_arm.wavefront
+        wavefront_bright.wavefront = 0.5*(1.0 - self.intensity_mismatch)*wavefront.wavefront + 0.5*(1.0)*wavefront_arm.wavefront
 
         wavefront.wavefront=wavefront_combined
 
