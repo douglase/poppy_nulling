@@ -187,7 +187,10 @@ class NullingCoronagraph(poppy.OpticalSystem):
 
             self.DM_array.opd= sheararray(self.DM_array.opd,-self.shear/2.,self.DM_array.pixelscale)
             _log.debug("initialized:"+str(self.DM_array))
-                        
+
+    def get_chromatic_shift(self,wavel):
+        raise ValueError("not yet implemented")
+    
     def null(self,wavelength=0.633e-6,wave_weight=1,flux=1.0,offset_x=0.0,offset_y=0.0,prebuilt_wavefront=False):
         '''
         nulls the Nulling Coronagraph according to the optical system prescription.
@@ -317,6 +320,9 @@ class NullingCoronagraph(poppy.OpticalSystem):
             displaywavefrontarm.wavefront=sheararray(displaywavefrontarm.wavefront,-self.shear,displaywavefrontarm.pixelscale)
             displaywavefrontarm.display(what='other',nrows=nrows,row=1, colorbar=True,vmax=wavefront_arm.amplitude.max(),vmin=wavefront_arm.amplitude.min())
         '''
+        if self.store_pupil:  
+            self.pupil_plane_raw = wavefront.copy()     
+            self.pupil_plane_umasked_dm_arm = wavefront_arm.copy()
 
         
         wavefront_combined = 0.5*(1.0 - self.intensity_mismatch)*wavefront.wavefront + 0.5*(-1.0)*wavefront_arm.wavefront
@@ -357,9 +363,8 @@ class NullingCoronagraph(poppy.OpticalSystem):
 
 
         if self.store_pupil:  
-            self.pupil_plane_dark=wavefront.wavefront.copy()     
-            self.pupil_dm_arm=wavefront_arm.wavefront
-
+            self.pupil_plane_interferred = wavefront.copy()     
+            
         '''
 	if self.display_intermediates:
 		intens = wavefront.intensity.copy()
@@ -418,3 +423,4 @@ class NullingCoronagraph(poppy.OpticalSystem):
         plt.colorbar(im)
         ax.set_title("N=%.2e"%nulldepth)
         return nulldepth
+
