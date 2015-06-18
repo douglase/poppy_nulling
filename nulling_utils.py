@@ -589,3 +589,31 @@ def congrid(a, newdims, method='linear', centre=False, minusone=False):
           "and \'spline\' are supported."
         return None
     
+
+
+    
+def simulate_noise(HDUList,t_exp,read_noise,dark_noise_rate):
+    '''
+    Parameters
+    ----------
+    HDUList:
+         astropy.io.fits.HDUList object to use as source
+    t_exp:
+         float [typically seconds]
+    read_noise:
+         float [electrons/exposure]
+    dark_noise_rate
+         float [dark noise per unit of t_exp, i.e. electrons/sec]
+
+    ----------
+
+    Return a numpy array
+
+    inject gaussian dark noise and poisson photon noise to data from first frame of an HDUlist.
+    '''
+    
+    detx,dety=np.shape(HDUList[0].data)
+    field_read_noise=np.sqrt(n_exp)*np.random.normal(0,read_noise, detx*dety).reshape([detx,dety]) 
+    DarkAndReadNoise= np.random.normal(0,np.sqrt(n_exp*read_noise**2 + dark_noise_rate*t_exp),detx*dety).reshape([detx,dety]) 
+    return nulling_utils.add_poisson_noise(HDUList[0].data*t_exp) + DarkAndReadNoise
+    
