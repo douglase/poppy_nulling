@@ -101,10 +101,12 @@ def add_nuller_to_header(primaryHDUList,nuller):
     '''
     primaryHDUList[0].header['PIXELSCL']=nuller.wavefront.asFITS()[0].header['PIXELSCL']
     primaryHDUList[0].header.add_history("shear: "+str(nuller.shear))
-    primaryHDUList[0].header.add_history(str(nuller.phase_mismatch_fits))
-    primaryHDUList[0].header.add_history(str(nuller.phase_flat_fits))
-    primaryHDUList[0].header.add_history(str(nuller.pupilmask))
-    primaryHDUList[0].header.add_history(str(nuller.name))
+    primaryHDUList[0].header.add_history("Phase Mismatch File:"+str(nuller.phase_mismatch_fits))
+    primaryHDUList[0].header.add_history("Phase flattening file:"+str(nuller.phase_flat_fits))
+    primaryHDUList[0].header.add_history("Intensity Mismatch:"+str(nuller.intensity_mismatch))
+
+    primaryHDUList[0].header.add_history("Pupil Mask file:"+str(nuller.pupilmask))
+    primaryHDUList[0].header.add_history("Nuller Name:"str(nuller.name))
     if nuller.defocus:
         primaryHDUList[0].header["OPD_PV"]=str(np.abs(nuller.defocus.opd.max())+np.abs(nuller.defocus.opd.min()))
     else:
@@ -352,9 +354,9 @@ def downsample_display(input,block=(10,10),
                         save=False,
                         filename='DownsampledOut.fits',
                         vmin=1e-8,vmax=1e1,
-                        ax=False,norm='log',add_noise=False):
+                        ax=False,norm='log',add_noise=False,skip_plot=False,**kwargs):
     '''
-    takes a wavefront's intensity, and generates a downsampled fits image for display and saving to disk.
+    takes an HDUList first frame and generates a downsampled fits image for display and saving to disk.
     '''
     print(str(type(input)))
     if str(type(input)) == "<class 'astropy.io.fits.hdu.hdulist.HDUList'>":
@@ -365,31 +367,32 @@ def downsample_display(input,block=(10,10),
         except Exception, err:
             print(err)
             raise ValueError("Type not recognized as wavefront")
+    downsampled=downsample(inFITS[0].data,block=block)
+
     if ax==False:
         plt.figure()
         ax = plt.subplot(111)
-        
-    cmap = matplotlib.cm.jet
-    halffov_x = inFITS[0].header['PIXELSCL']*inFITS[0].data.shape[1]/2
-    halffov_y = inFITS[0].header['PIXELSCL']*inFITS[0].data.shape[0]/2
-    extent = [-halffov_x, halffov_x, -halffov_y, halffov_y]
-    unit="arcsec"
-    if norm=="log":
-        norm=LogNorm(vmin=vmin,vmax=vmax)
-    else:
-        norm=Normalize(vmin=vmin,vmax=vmax)
-    plt.xlabel(unit)
-    downsampled=downsample(inFITS[0].data,block=block)
-    titlestring=str(inFITS[0].data.shape)+" array, downsampled by:"+str(block)
-    plt.title(titlestring)
-    poppy.utils.imshow_with_mouseover(downsampled,ax=ax, interpolation='none',  extent=extent, norm=norm, cmap=cmap)
-    plt.colorbar(ax.images[0])
+    if not skip_plot:
+        cmap = matplotlib.cm.jet
+        halffov_x = inFITS[0].header['PIXELSCL']*inFITS[0].data.shape[1]/2
+        halffov_y = inFITS[0].header['PIXELSCL']*inFITS[0].data.shape[0]/2
+        extent = [-halffov_x, halffov_x, -halffov_y, halffov_y]
+        unit="arcsec"
+        if norm=="log":
+            norm=LogNorm(vmin=vmin,vmax=vmax)
+        else:
+            norm=Normalize(vmin=vmin,vmax=vmax)
+        plt.xlabel(unit)
+        titlestring=str(inFITS[0].data.shape)+" array, downsampled by:"+str(block)
+        plt.title(titlestring)
+        poppy.utils.imshow_with_mouseover(downsampled,ax=ax, interpolation='none',  extent=extent, norm=norm, cmap=cmap)
+        plt.colorbar(ax.images[0])
     outFITS = fits.HDUList(fits.PrimaryHDU(data=downsampled,header=inFITS[0].header))
     newpixelscale=inFITS[0].header['PIXELSCL']*block[0]
     outFITS[0].header.update('PIXELSCL', newpixelscale, 'Scale in arcsec/pix (after oversampling and subsequent downsampling)')
     outFITS[0].header.add_history(titlestring)
     try:
-        outFITS.writeto(filename)
+        outFITS.writeto(filename,**kwargs)
     except Exception, err:
         print(err)
     return outFITS
