@@ -106,7 +106,7 @@ def add_nuller_to_header(primaryHDUList,nuller):
     primaryHDUList[0].header.add_history("Intensity Mismatch:"+str(nuller.intensity_mismatch))
 
     primaryHDUList[0].header.add_history("Pupil Mask file:"+str(nuller.pupilmask))
-    primaryHDUList[0].header.add_history("Nuller Name:"str(nuller.name))
+    primaryHDUList[0].header.add_history("Nuller Name:"+str(nuller.name))
     if nuller.defocus:
         primaryHDUList[0].header["OPD_PV"]=str(np.abs(nuller.defocus.opd.max())+np.abs(nuller.defocus.opd.min()))
     else:
