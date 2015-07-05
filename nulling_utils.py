@@ -368,11 +368,12 @@ def downsample_display(input,block=(10,10),
             print(err)
             raise ValueError("Type not recognized as wavefront")
     downsampled=downsample(inFITS[0].data,block=block)
-
-    if ax==False:
-        plt.figure()
-        ax = plt.subplot(111)
+    titlestring=str(inFITS[0].data.shape)+" array, downsampled by:"+str(block)
     if not skip_plot:
+        if ax==False:
+            plt.figure()
+            ax = plt.subplot(111)
+
         cmap = matplotlib.cm.jet
         halffov_x = inFITS[0].header['PIXELSCL']*inFITS[0].data.shape[1]/2
         halffov_y = inFITS[0].header['PIXELSCL']*inFITS[0].data.shape[0]/2
@@ -383,7 +384,6 @@ def downsample_display(input,block=(10,10),
         else:
             norm=Normalize(vmin=vmin,vmax=vmax)
         plt.xlabel(unit)
-        titlestring=str(inFITS[0].data.shape)+" array, downsampled by:"+str(block)
         plt.title(titlestring)
         poppy.utils.imshow_with_mouseover(downsampled,ax=ax, interpolation='none',  extent=extent, norm=norm, cmap=cmap)
         plt.colorbar(ax.images[0])
@@ -439,7 +439,7 @@ def InputWavefrontFromField(inwave,field,arcsec_per_pixel,zero_init_wavefront=Tr
     inwave.display(what='other',nrows=2,row=1, colorbar=True)
     return inwave
 
-def display_inset(inFITS,x1, x2, y1, y2,zoom=2.0,title="",suppressinset=False,figsize=[7,5],**kwargs):
+def display_inset(inFITS,x1, x2, y1, y2,zoom=2.0,title="",suppressinset=False,figsize=[7,5],cmap='gist_heat',**kwargs):
     '''
     
     displays the first array of the FITS hdulist inFITS and a zoomed inset of the subregion defined by the  [x1:x2,y1:y2] 
@@ -463,12 +463,12 @@ def display_inset(inFITS,x1, x2, y1, y2,zoom=2.0,title="",suppressinset=False,fi
     extent = [-halffov_x, halffov_x, -halffov_y, halffov_y]
     ax.set_xlim([-halffov_x, halffov_x])
     ax.imshow(Z, extent=extent, interpolation="none",
-              origin="lower",cmap='gist_heat',**kwargs)
+              origin="lower",cmap=cmap,**kwargs)
     ax.set_xlabel("Arcseconds",fontsize=16)
     ax.set_ylabel("Arcseconds",fontsize=16)
     axins = zoomed_inset_axes(ax, zoom, loc=1) # zoom = 6
     if suppressinset==False:
-        axins.imshow(np.array(Z2), extent=extent, interpolation="none",origin="lower",cmap='gist_heat',**kwargs)
+        axins.imshow(np.array(Z2), extent=extent, interpolation="none",origin="lower",cmap=cmap,**kwargs)
         
         # sub region of the original image
         axins.set_xlim(x1, x2)
@@ -595,7 +595,7 @@ def congrid(a, newdims, method='linear', centre=False, minusone=False):
 
 
     
-def simulate_noise(HDUList,t_exp,read_noise,dark_noise_rate):
+def simulate_noise(HDUList,t_exp,n_exp,read_noise,dark_noise_rate):
     '''
     Parameters
     ----------
@@ -618,5 +618,5 @@ def simulate_noise(HDUList,t_exp,read_noise,dark_noise_rate):
     detx,dety=np.shape(HDUList[0].data)
     field_read_noise=np.sqrt(n_exp)*np.random.normal(0,read_noise, detx*dety).reshape([detx,dety]) 
     DarkAndReadNoise= np.random.normal(0,np.sqrt(n_exp*read_noise**2 + dark_noise_rate*t_exp),detx*dety).reshape([detx,dety]) 
-    return nulling_utils.add_poisson_noise(HDUList[0].data*t_exp) + DarkAndReadNoise
+    return fits.HDUList([fits.PrimaryHDU(add_poisson_noise(HDUList[0].data*t_exp) + DarkAndReadNoise,header=HDUList[0].header)])
     
