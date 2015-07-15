@@ -15,6 +15,7 @@ from mpl_toolkits.axes_grid1.inset_locator import zoomed_inset_axes
 from mpl_toolkits.axes_grid1.inset_locator import mark_inset
 from matplotlib.colors import LogNorm, Normalize  # for log scaling of images, with automatic colorbar support
 from numpy.lib.stride_tricks import as_strided as ast
+import matplotlib.ticker as ticker
 
 
 def add_poisson_noise(photons):
@@ -439,7 +440,14 @@ def InputWavefrontFromField(inwave,field,arcsec_per_pixel,zero_init_wavefront=Tr
     inwave.display(what='other',nrows=2,row=1, colorbar=True)
     return inwave
 
-def display_inset(inFITS,x1, x2, y1, y2,zoom=2.0,title="",suppressinset=False,figsize=[7,5],cmap='gist_heat',**kwargs):
+    
+def exponential_colorbarfmt(x, pos):
+    #        http://stackoverflow.com/a/25983372
+        a, b = '{:.2e}'.format(x).split('e')
+        b = int(b)
+        return r'${} \times 10^{{{}}}$'.format(a, b)
+
+def display_inset(inFITS,x1, x2, y1, y2,zoom=2.0,title="",suppressinset=False,figsize=[7,5],cmap='gist_heat',cbar_title="Counts",exp_colorbar=False,**kwargs):
     '''
     
     displays the first array of the FITS hdulist inFITS and a zoomed inset of the subregion defined by the  [x1:x2,y1:y2] 
@@ -449,8 +457,9 @@ def display_inset(inFITS,x1, x2, y1, y2,zoom=2.0,title="",suppressinset=False,fi
     
     using example from:
     http://matplotlib.org/mpl_toolkits/axes_grid/users/overview.html#insetlocator
-    '''
+    ''' 
  
+
 
     fig, ax = plt.subplots(figsize=figsize)
     
@@ -481,9 +490,13 @@ def display_inset(inFITS,x1, x2, y1, y2,zoom=2.0,title="",suppressinset=False,fi
     plt.xticks(visible=False)
     plt.yticks(visible=False)
     cax = fig.add_axes([0.88, 0.05, 0.05, 0.9])
-    cax.set_title("Counts",size=12)
+    cax.set_title(cbar_title,size=12)
     cax.tick_params(labelsize=12)
-    plt.colorbar(ax.images[0],cax=cax) 
+    if exp_colorbar:
+        plt.colorbar(ax.images[0],cax=cax, format=ticker.FuncFormatter(exponential_colorbarfmt))
+    else:
+        plt.colorbar(ax.images[0],cax=cax)
+
     plt.setp(ax.spines.values(), color='white')
     plt.setp([ax.get_xticklines(), ax.get_yticklines()], color='white')
     ax.tick_params(labelsize=16)
