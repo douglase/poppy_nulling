@@ -322,7 +322,7 @@ class NullingCoronagraph(poppy.OpticalSystem):
         '''
         if self.store_pupil:  
             self.pupil_plane_raw = wavefront.copy()     
-            self.pupil_plane_umasked_dm_arm = wavefront_arm.copy()
+            self.pupil_plane_unmasked_dm_arm = wavefront_arm.copy()
 
         
         wavefront_combined = 0.5*(1.0 - self.intensity_mismatch)*wavefront.wavefront + 0.5*(-1.0)*wavefront_arm.wavefront
