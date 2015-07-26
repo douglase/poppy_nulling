@@ -15,6 +15,7 @@ from mpl_toolkits.axes_grid1.inset_locator import zoomed_inset_axes
 from mpl_toolkits.axes_grid1.inset_locator import mark_inset
 from matplotlib.colors import LogNorm, Normalize  # for log scaling of images, with automatic colorbar support
 from numpy.lib.stride_tricks import as_strided as ast
+import matplotlib.ticker as ticker
 
 
 def add_poisson_noise(photons):
@@ -101,10 +102,12 @@ def add_nuller_to_header(primaryHDUList,nuller):
     '''
     primaryHDUList[0].header['PIXELSCL']=nuller.wavefront.asFITS()[0].header['PIXELSCL']
     primaryHDUList[0].header.add_history("shear: "+str(nuller.shear))
-    primaryHDUList[0].header.add_history(str(nuller.phase_mismatch_fits))
-    primaryHDUList[0].header.add_history(str(nuller.phase_flat_fits))
-    primaryHDUList[0].header.add_history(str(nuller.pupilmask))
-    primaryHDUList[0].header.add_history(str(nuller.name))
+    primaryHDUList[0].header.add_history("Phase Mismatch File:"+str(nuller.phase_mismatch_fits))
+    primaryHDUList[0].header.add_history("Phase flattening file:"+str(nuller.phase_flat_fits))
+    primaryHDUList[0].header.add_history("Intensity Mismatch:"+str(nuller.intensity_mismatch))
+
+    primaryHDUList[0].header.add_history("Pupil Mask file:"+str(nuller.pupilmask))
+    primaryHDUList[0].header.add_history("Nuller Name:"+str(nuller.name))
     if nuller.defocus:
         primaryHDUList[0].header["OPD_PV"]=str(np.abs(nuller.defocus.opd.max())+np.abs(nuller.defocus.opd.min()))
     else:
@@ -352,9 +355,9 @@ def downsample_display(input,block=(10,10),
                         save=False,
                         filename='DownsampledOut.fits',
                         vmin=1e-8,vmax=1e1,
-                        ax=False,norm='log',add_noise=False):
+                        ax=False,norm='log',add_noise=False,skip_plot=False,**kwargs):
     '''
-    takes a wavefront's intensity, and generates a downsampled fits image for display and saving to disk.
+    takes an HDUList first frame and generates a downsampled fits image for display and saving to disk.
     '''
     print(str(type(input)))
     if str(type(input)) == "<class 'astropy.io.fits.hdu.hdulist.HDUList'>":
@@ -365,31 +368,32 @@ def downsample_display(input,block=(10,10),
         except Exception, err:
             print(err)
             raise ValueError("Type not recognized as wavefront")
-    if ax==False:
-        plt.figure()
-        ax = plt.subplot(111)
-        
-    cmap = matplotlib.cm.jet
-    halffov_x = inFITS[0].header['PIXELSCL']*inFITS[0].data.shape[1]/2
-    halffov_y = inFITS[0].header['PIXELSCL']*inFITS[0].data.shape[0]/2
-    extent = [-halffov_x, halffov_x, -halffov_y, halffov_y]
-    unit="arcsec"
-    if norm=="log":
-        norm=LogNorm(vmin=vmin,vmax=vmax)
-    else:
-        norm=Normalize(vmin=vmin,vmax=vmax)
-    plt.xlabel(unit)
     downsampled=downsample(inFITS[0].data,block=block)
     titlestring=str(inFITS[0].data.shape)+" array, downsampled by:"+str(block)
-    plt.title(titlestring)
-    poppy.utils.imshow_with_mouseover(downsampled,ax=ax, interpolation='none',  extent=extent, norm=norm, cmap=cmap)
-    plt.colorbar(ax.images[0])
+    if not skip_plot:
+        if ax==False:
+            plt.figure()
+            ax = plt.subplot(111)
+
+        cmap = matplotlib.cm.jet
+        halffov_x = inFITS[0].header['PIXELSCL']*inFITS[0].data.shape[1]/2
+        halffov_y = inFITS[0].header['PIXELSCL']*inFITS[0].data.shape[0]/2
+        extent = [-halffov_x, halffov_x, -halffov_y, halffov_y]
+        unit="arcsec"
+        if norm=="log":
+            norm=LogNorm(vmin=vmin,vmax=vmax)
+        else:
+            norm=Normalize(vmin=vmin,vmax=vmax)
+        plt.xlabel(unit)
+        plt.title(titlestring)
+        poppy.utils.imshow_with_mouseover(downsampled,ax=ax, interpolation='none',  extent=extent, norm=norm, cmap=cmap)
+        plt.colorbar(ax.images[0])
     outFITS = fits.HDUList(fits.PrimaryHDU(data=downsampled,header=inFITS[0].header))
     newpixelscale=inFITS[0].header['PIXELSCL']*block[0]
     outFITS[0].header.update('PIXELSCL', newpixelscale, 'Scale in arcsec/pix (after oversampling and subsequent downsampling)')
     outFITS[0].header.add_history(titlestring)
     try:
-        outFITS.writeto(filename)
+        outFITS.writeto(filename,**kwargs)
     except Exception, err:
         print(err)
     return outFITS
@@ -436,7 +440,14 @@ def InputWavefrontFromField(inwave,field,arcsec_per_pixel,zero_init_wavefront=Tr
     inwave.display(what='other',nrows=2,row=1, colorbar=True)
     return inwave
 
-def display_inset(inFITS,x1, x2, y1, y2,zoom=2.0,title="",suppressinset=False,figsize=[7,5],**kwargs):
+    
+def exponential_colorbarfmt(x, pos):
+    #        http://stackoverflow.com/a/25983372
+        a, b = '{:.2e}'.format(x).split('e')
+        b = int(b)
+        return r'${} \times 10^{{{}}}$'.format(a, b)
+
+def display_inset(inFITS,x1, x2, y1, y2,zoom=2.0,title="",suppressinset=False,figsize=[7,5],cmap='gist_heat',cbar_title="Counts",exp_colorbar=False,**kwargs):
     '''
     
     displays the first array of the FITS hdulist inFITS and a zoomed inset of the subregion defined by the  [x1:x2,y1:y2] 
@@ -460,12 +471,12 @@ def display_inset(inFITS,x1, x2, y1, y2,zoom=2.0,title="",suppressinset=False,fi
     extent = [-halffov_x, halffov_x, -halffov_y, halffov_y]
     ax.set_xlim([-halffov_x, halffov_x])
     ax.imshow(Z, extent=extent, interpolation="none",
-              origin="lower",cmap='gist_heat',**kwargs)
+              origin="lower",cmap=cmap,**kwargs)
     ax.set_xlabel("Arcseconds",fontsize=16)
     ax.set_ylabel("Arcseconds",fontsize=16)
     axins = zoomed_inset_axes(ax, zoom, loc=1) # zoom = 6
     if suppressinset==False:
-        axins.imshow(np.array(Z2), extent=extent, interpolation="none",origin="lower",cmap='gist_heat',**kwargs)
+        axins.imshow(np.array(Z2), extent=extent, interpolation="none",origin="lower",cmap=cmap,**kwargs)
         
         # sub region of the original image
         axins.set_xlim(x1, x2)
@@ -478,9 +489,13 @@ def display_inset(inFITS,x1, x2, y1, y2,zoom=2.0,title="",suppressinset=False,fi
     plt.xticks(visible=False)
     plt.yticks(visible=False)
     cax = fig.add_axes([0.88, 0.05, 0.05, 0.9])
-    cax.set_title("Counts",size=12)
+    cax.set_title(cbar_title,size=12)
     cax.tick_params(labelsize=12)
-    plt.colorbar(ax.images[0],cax=cax) 
+    if exp_colorbar:
+        plt.colorbar(ax.images[0],cax=cax, format=ticker.FuncFormatter(exponential_colorbarfmt))
+    else:
+        plt.colorbar(ax.images[0],cax=cax)
+
     plt.setp(ax.spines.values(), color='white')
     plt.setp([ax.get_xticklines(), ax.get_yticklines()], color='white')
     ax.tick_params(labelsize=16)
@@ -622,3 +637,31 @@ def refractive_index_material(material, wlengths):
           +B3*wlengths**2/(wlengths**2-C3))
     return n
 
+
+
+    
+def simulate_noise(HDUList,t_exp,n_exp,read_noise,dark_noise_rate):
+    '''
+    Parameters
+    ----------
+    HDUList:
+         astropy.io.fits.HDUList object to use as source
+    t_exp:
+         float [typically seconds]
+    read_noise:
+         float [electrons/exposure]
+    dark_noise_rate
+         float [dark noise per unit of t_exp, i.e. electrons/sec]
+
+    ----------
+
+    Return a numpy array
+
+    inject gaussian dark noise and poisson photon noise to data from first frame of an HDUlist.
+    '''
+    
+    detx,dety=np.shape(HDUList[0].data)
+    field_read_noise=np.sqrt(n_exp)*np.random.normal(0,read_noise, detx*dety).reshape([detx,dety]) 
+    DarkAndReadNoise= np.random.normal(0,np.sqrt(n_exp*read_noise**2 + dark_noise_rate*t_exp),detx*dety).reshape([detx,dety]) 
+    return fits.HDUList([fits.PrimaryHDU(add_poisson_noise(HDUList[0].data*t_exp) + DarkAndReadNoise,header=HDUList[0].header)])
+    
