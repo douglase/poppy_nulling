@@ -457,7 +457,7 @@ def display_inset(inFITS,x1, x2, y1, y2,zoom=2.0,title="",suppressinset=False,fi
     
     using example from:
     http://matplotlib.org/mpl_toolkits/axes_grid/users/overview.html#insetlocator
-    '''
+    ''' 
  
 
 
@@ -605,6 +605,35 @@ def congrid(a, newdims, method='linear', centre=False, minusone=False):
           "and \'spline\' are supported."
         return None
     
+
+
+def refractive_index_material(material, wlengths):
+    '''
+    Returns n(wavelength) for given material.
+    '''
+    if material == 'fused silica':
+        B1=0.696166300
+        B2=0.407942600
+        B3=0.897479400
+        C1=4.67914826*10**(-3)#um2
+        C2=1.35120631*10**(-2)#um2
+        C3=97.9340025# um2
+    elif material == 'BK7':
+        B1=1.03961212
+        B2=0.231792344
+        B3=1.01046945
+        C1=6.00069867*10**(-3)#um2
+        C2=2.00179144*10**(-2)#um2
+        C3=103.5606535# um2
+    else:
+        raise ValueError("Requested material not implemented.")
+        return
+    #Sellmeier eq:
+    n=np.sqrt(1+B1*wlengths**2/(wlengths**2-C1)
+          +B2*wlengths**2/(wlengths**2-C2)
+          +B3*wlengths**2/(wlengths**2-C3))
+    return n
+
 
 
     

@@ -187,13 +187,20 @@ class NullingCoronagraph(poppy.OpticalSystem):
 
             self.DM_array.opd= sheararray(self.DM_array.opd,-self.shear/2.,self.DM_array.pixelscale)
             _log.debug("initialized:"+str(self.DM_array))
-                        
+
+    def get_chromatic_shift(self,wavel):
+        raise ValueError("not yet implemented")
+    
     def null(self,wavelength=0.633e-6,wave_weight=1,flux=1.0,offset_x=0.0,offset_y=0.0,prebuilt_wavefront=False):
         '''
         nulls the Nulling Coronagraph according to the optical system prescription.
         After null runs, the nullstatus is set to True.
         Returns: a tuple of the dark and bright outputs: (self.wavefront, wavefront_bright).
         Flux should be counts/second.
+
+        Assumes a $\pi$ phase shift and thus simply subtracts the two arms:
+        
+        $Ae^{-i*\phi}+A_2e^{-i(\phi_2+\pi)}=Ae^{-i*\phi}+A_2e^{-i\phi_2}(-1)=Ae^{-i*\phi}-A_2e^{-i\phi_2}$
         '''
         nrows=6
         if poppy.Conf.enable_speed_tests():
@@ -317,9 +324,13 @@ class NullingCoronagraph(poppy.OpticalSystem):
             displaywavefrontarm.wavefront=sheararray(displaywavefrontarm.wavefront,-self.shear,displaywavefrontarm.pixelscale)
             displaywavefrontarm.display(what='other',nrows=nrows,row=1, colorbar=True,vmax=wavefront_arm.amplitude.max(),vmin=wavefront_arm.amplitude.min())
         '''
+        if self.store_pupil:  
+            self.pupil_plane_raw = wavefront.copy()     
+            self.pupil_plane_umasked_dm_arm = wavefront_arm.copy()
 
-        wavefront_combined = ( 0.5*(1.0 - self.intensity_mismatch/2.0)*wavefront.wavefront + 0.5*(-1.0 + self.intensity_mismatch/2.0)*wavefront_arm.wavefront)
-        wavefront_bright.wavefront =( 0.5*(1.0 + self.intensity_mismatch/2.0)*wavefront.wavefront + 0.5*(1.0 + self.intensity_mismatch/2.0)*wavefront_arm.wavefront)
+        
+        wavefront_combined = 0.5*(1.0 - self.intensity_mismatch)*wavefront.wavefront + 0.5*(-1.0)*wavefront_arm.wavefront
+        wavefront_bright.wavefront = 0.5*(1.0 - self.intensity_mismatch)*wavefront.wavefront + 0.5*(1.0)*wavefront_arm.wavefront
 
         wavefront.wavefront=wavefront_combined
 
@@ -356,9 +367,8 @@ class NullingCoronagraph(poppy.OpticalSystem):
 
 
         if self.store_pupil:  
-            self.pupil_plane_dark=wavefront.wavefront.copy()     
-            self.pupil_dm_arm=wavefront_arm.wavefront
-
+            self.pupil_plane_interferred = wavefront.copy()     
+            
         '''
 	if self.display_intermediates:
 		intens = wavefront.intensity.copy()
@@ -398,14 +408,23 @@ class NullingCoronagraph(poppy.OpticalSystem):
     # self.pupil_plane_dark =	wavefront.copy()
 
 
-    def measure_null(self,function=np.max):
+    def measure_null(self,function=np.max,ax=None,**kwargs):
+        '''
+        measure and plot null depth as
+        N=function(dark_output)/ function(bright_output).
+        
+        '''
+        
+        if ax is None:
+            fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(6,6))
         if self.nullerstatus is False:
             self.null()
         dark = self.wavefront.intensity
         bright = self.wavefront_bright.intensity
-        null_image_flat_2D_dm = dark/np.max(bright,axis=0)
-        nulldepth = function(dark)/function(bright)
-        plt.imshow(np.log10(null_image_flat_2D_dm), interpolation='none')
-        plt.colorbar()
-        plt.title("N=%.2e"%nulldepth)
+        null_image_flat_2D_dm = dark/function(bright,**kwargs)
+        nulldepth = function(dark)/function(bright,**kwargs)
+        im=ax.imshow(np.log10(null_image_flat_2D_dm), interpolation='none')
+        plt.colorbar(im)
+        ax.set_title("N=%.2e"%nulldepth)
         return nulldepth
+
