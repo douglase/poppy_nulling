@@ -594,8 +594,11 @@ def congrid(a, newdims, method='linear', centre=False, minusone=False):
 def refractive_index_material(material, wlengths):
     '''
     Returns n(wavelength) for given material.
+    Constants found via http://refractiveindex.info/ and checked against cited sources
     '''
     if material == 'fused silica':
+        print("Using Fused Silica Dispersion Constants from Malitson, I. H. (1965), Interspecimen comparison of the refractive index of fused silica, JOSA, 55(10), 120-1208.")
+
         B1=0.696166300
         B2=0.407942600
         B3=0.897479400
@@ -603,6 +606,7 @@ def refractive_index_material(material, wlengths):
         C2=1.35120631*10**(-2)#um2
         C3=97.9340025# um2
     elif material == 'BK7':
+        print("N-BK7 Dispersion Constants from SCHOTT Datasheet")
         B1=1.03961212
         B2=0.231792344
         B3=1.01046945
