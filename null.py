@@ -197,6 +197,10 @@ class NullingCoronagraph(poppy.OpticalSystem):
         After null runs, the nullstatus is set to True.
         Returns: a tuple of the dark and bright outputs: (self.wavefront, wavefront_bright).
         Flux should be counts/second.
+
+        Assumes a $\pi$ phase shift and thus simply subtracts the two arms:
+        
+        $Ae^{-i*\phi}+A_2e^{-i(\phi_2+\pi)}=Ae^{-i*\phi}+A_2e^{-i\phi_2}(-1)=Ae^{-i*\phi}-A_2e^{-i\phi_2}$
         '''
         nrows=6
         if poppy.Conf.enable_speed_tests():
