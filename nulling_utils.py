@@ -335,10 +335,10 @@ def find_annular_profiles(HDUlist_or_filename=None,
             #wg = np.where( (r >= rr[i-1]) &  (r <rr[i] )))
         #print(wg)
         stddevs[i] = image[wg].std()
-        if weights[wg].sum()>0:
-            weighted_avg[i]=np.average(image[wg],weights=weights[wg])
-
-            weighted_std[i] = np.sqrt(np.average((image[wg]- weighted_avg[i])**2, weights=weights[wg]))
+        if weights not None:
+            if weights[wg].sum()>0:
+                weighted_avg[i]=np.average(image[wg],weights=weights[wg])
+                weighted_std[i] = np.sqrt(np.average((image[wg]- weighted_avg[i])**2, weights=weights[wg]))
         annularvals.append(image[wg])  
 
     EE = csim[rind]
