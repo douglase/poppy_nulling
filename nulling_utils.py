@@ -457,7 +457,7 @@ def display_inset(inFITS,x1, x2, y1, y2,zoom=2.0,title="",suppressinset=False,fi
     
     using example from:
     http://matplotlib.org/mpl_toolkits/axes_grid/users/overview.html#insetlocator
-    '''
+    ''' 
  
 
     fig, ax = plt.subplots(figsize=figsize)

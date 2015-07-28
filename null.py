@@ -43,12 +43,16 @@ def sheararray(inputarray,shear,pixelscale):
     return sheared
 
 class NullingCoronagraph(poppy.OpticalSystem):
-    print('nulling class')
     """
     based on POPPY Module:SemiAnalyticCoronagraph
+    Generates bright and dark focal plane images for a tightly constrained nuller based on the
+    PICTURE VNC.
 
-
-
+    Originally intended for the very specific case of testing deformable mirror surface effects,
+    the default configuration requires a DM surface map and a flattened, low spatial frequency correction map.
+    This is very rough, purpose built code, please consult the authors to confirm use is appropriate.
+    
+    
     Parameters
     -----------
     ExistingOpticalSystem : OpticalSystem
@@ -82,21 +86,33 @@ class NullingCoronagraph(poppy.OpticalSystem):
                 input pupil obscuration, i.e. secondary, uses phase_mismatch_meters_pixel scaling, defaults to False.
     verbose:
         Default is True,
-    defocus: ThinLens(AnalyticOpticalElement) or False
-        defocusing term to apply to the interferred pupil.
+    defocus: FITSOpticalElement or False
+        defocusing term to apply to the interferred pupil (can be any complex wavefront, not necc. defocus term).
+    store_pupil:
+        Default is False. Stores copies of intermediate wavefronts as attributes of this class.
+    References:
+        Serabyn, 2000, Proc. SPIE.
+        Rao et al, 2008, Proc. SPIE.
+        Mendillo et al, 2012, Proc. SPIE.
+        
     """
 
     def __init__(self, ExistingOpticalSystem,
         oversample=False,
         wavelength=0.633e-6,
         normalize='last',
-        save_intermediates=False, display_intermediates=True,
+        save_intermediates=False,
+        display_intermediates=True,
         shear=0.3,
         intensity_mismatch=0.000,
         phase_mismatch_fits=False,
-        phase_mismatch_meters_pixel=0, phase_flat_fits=False,
+        phase_mismatch_meters_pixel=0,
+         phase_flat_fits=False,
         obscuration_fname=False,
-        pupilmask=False,verbose=True,defocus=False,store_pupil=False):
+        pupilmask=False,
+        verbose=True,
+        defocus=False,
+        store_pupil=False):
 
         self.phase_mismatch_fits=phase_mismatch_fits
         self.pupilmask=pupilmask
@@ -197,6 +213,10 @@ class NullingCoronagraph(poppy.OpticalSystem):
         After null runs, the nullstatus is set to True.
         Returns: a tuple of the dark and bright outputs: (self.wavefront, wavefront_bright).
         Flux should be counts/second.
+
+        Assumes a $\pi$ phase shift and thus simply subtracts the two arms:
+        
+        $Ae^{-i*\phi}+A_2e^{-i(\phi_2+\pi)}=Ae^{-i*\phi}+A_2e^{-i\phi_2}(-1)=Ae^{-i*\phi}-A_2e^{-i\phi_2}$
         '''
         nrows=6
         if poppy.Conf.enable_speed_tests():
@@ -283,9 +303,6 @@ class NullingCoronagraph(poppy.OpticalSystem):
             self.mask_array = self.FITSmask.amplitude#,self.shear/2.,self.FITSmask.pixelscale)
 
             #calculate the effect of phase differences between the arms:
-
-
-
         
         try:
             _log.debug("RMS OPD error mismatch, (includes beyond mask):"+str(np.mean(np.sqrt(self.DM_array.opd**2))))
@@ -304,22 +321,6 @@ class NullingCoronagraph(poppy.OpticalSystem):
             _log.warn("is DM_array defined?")
         wavefront_arm.wavefront = sheararray(wavefront_arm.wavefront,self.shear,wavefront_arm.pixelscale) #sheared
         #interfere the arms, accounting for fractional intensity mismatch between the arms: 
-        '''if self.display_intermediates:
-            plt.figure()
-            plt.subplot(121)
-            plt.title("Wavefront arm OPD [radians]")
-            plt.imshow(wavefront_arm.phase)#*wavefront.wavelength/(2.0*np.pi))
-            plt.colorbar()
-            plt.subplot(122)
-            plt.title("wavefront arm phase * mask")
-            plt.imshow(wavefront_arm.phase*self.mask_array)#*wavefront.wavelength/(2.0*np.pi))
-            plt.colorbar()
-            plt.figure()
-            displaywavefrontarm=wavefront_arm.copy()
-            displaywavefrontarm.wavefront=displaywavefrontarm.wavefront*self.mask_array
-            displaywavefrontarm.wavefront=sheararray(displaywavefrontarm.wavefront,-self.shear,displaywavefrontarm.pixelscale)
-            displaywavefrontarm.display(what='other',nrows=nrows,row=1, colorbar=True,vmax=wavefront_arm.amplitude.max(),vmin=wavefront_arm.amplitude.min())
-        '''
         if self.store_pupil:  
             self.pupil_plane_raw = wavefront.copy()     
             self.pupil_plane_unmasked_dm_arm = wavefront_arm.copy()
@@ -365,29 +366,6 @@ class NullingCoronagraph(poppy.OpticalSystem):
         if self.store_pupil:  
             self.pupil_plane_interferred = wavefront.copy()     
             
-        '''
-	if self.display_intermediates:
-		intens = wavefront.intensity.copy()
-		phase  = wavefront.phase.copy()
-        phase[np.where(intens ==0)] = 0.0
-		   
-		_log.debug("Mean RMS wavefront error in combined, masked wavefront:"   +str(wavefront.wavelength*(np.mean(np.sqrt(phase**2)))/(2*np.pi)))
-		plt.figure()
-		ax=plt.subplot(111)
-		wavefront.display(what='other',nrows=2,row=1, colorbar=True,vmax=wavefront.amplitude.max(),vmin=wavefront.amplitude.min())
-		plt.figure()
-		ax2=plt.subplot(111)
-		ax2.imshow(np.log10(phase))#wavefront.wavelength*/(2*np.pi))
-		ax2.set_title("Phase errors, [$log_{10}$(radians)]")
-		plt.colorbar(ax2.images[0])
-		plt.figure()
-		ax3=plt.subplot(111)
-		ax3.set_title("Oversampled Pupil Intensity Map [$log_{10}$(counts)]")
-		ax3.imshow(np.log10(wavefront.intensity))#wavefront.wavelength*/(2*np.pi))
-		plt.colorbar(ax3.images[0])
-		#suptitle.remove() #  does not work due to some matplotlib limitation, so work around:
-		suptitle.set_text('') # clean up before next iteration to avoid ugly overwriting
-        '''
         wavefront.propagateTo(self.detector)
         wavefront_bright.propagateTo(self.detector)
         if poppy.Conf.enable_flux_tests():
