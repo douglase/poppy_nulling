@@ -302,7 +302,6 @@ def find_annular_profiles(HDUlist_or_filename=None,
     r = np.sqrt( (x-center[0])**2 + (y-center[1])**2) *pixelscale / binsize # radius in bin size steps
     ind = np.argsort(r.flat)
 
-
     sr = r.flat[ind]
     sim = image.flat[ind]
     ri = sr.astype(int)
@@ -332,6 +331,8 @@ def find_annular_profiles(HDUlist_or_filename=None,
         else: 
             wg = np.where( (r_pix >= (radius-binsize/2)) &  (r_pix < (radius+binsize/2)))
             #print radius-binsize/2, radius+binsize/2, len(wg[0])
+            #print r_pix >  (radius-binsize/2)
+            #sprint  (r_pix < (radius+binsize/2))
             #wg = np.where( (r >= rr[i-1]) &  (r <rr[i] )))
         #print(wg)
         stddevs[i] = image[wg].std()
@@ -348,7 +349,8 @@ def find_annular_profiles(HDUlist_or_filename=None,
             'annularvals':annularvals,
             'stddevs':stddevs,
             'weighted_avg':weighted_avg,
-            'weighted_std':weighted_std}
+            'weighted_std':weighted_std,
+            "tsum":tbin}
 
 
 def downsample_display(input,block=(10,10),
@@ -447,7 +449,7 @@ def exponential_colorbarfmt(x, pos):
         b = int(b)
         return r'${} \times 10^{{{}}}$'.format(a, b)
 
-def display_inset(inFITS,x1, x2, y1, y2,zoom=2.0,title="",suppressinset=False,figsize=[7,5],cmap='gist_heat',cbar_title="Counts",exp_colorbar=False,**kwargs):
+def display_inset(inFITS,x1, x2, y1, y2,zoom=2.0,title="",suppressinset=False,figsize=[7,5],cmap='gist_heat',cbar_title="Counts",exp_colorbar=False,ax=None,**kwargs):
     '''
     
     displays the first array of the FITS hdulist inFITS and a zoomed inset of the subregion defined by the  [x1:x2,y1:y2] 
@@ -457,10 +459,10 @@ def display_inset(inFITS,x1, x2, y1, y2,zoom=2.0,title="",suppressinset=False,fi
     
     using example from:
     http://matplotlib.org/mpl_toolkits/axes_grid/users/overview.html#insetlocator
-    ''' 
+    '''
  
-
-    fig, ax = plt.subplots(figsize=figsize)
+    if ax == None:
+        fig, ax = plt.subplots(figsize=figsize)
     
     # prepare the demo image
     Z = inFITS[0].data
