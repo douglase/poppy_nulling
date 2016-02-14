@@ -168,11 +168,11 @@ class NullingCoronagraph(poppy.OpticalSystem):
                 _log.warn(err)
         elif type(self.phase_mismatch_fits)==poppy.FITSOpticalElement:
             _log.debug("phase mismatch is a FITSOptical Element")
-            self.DM_array = self.phase_mismatch_fits
+            DM_array = self.phase_mismatch_fits
 
         else:
             _log.warn("phase mismatch is not a FITS HDUList, trying to use it as if it's a FITSOpticalElement")
-            self.DM_array = self.phase_mismatch_fits
+            DM_array = self.phase_mismatch_fits
             
             #a low passed version to subtract, simulating flattening the DM:
             if self.phase_flat_fits:
@@ -259,8 +259,8 @@ class NullingCoronagraph(poppy.OpticalSystem):
                 wavefront_ideal *=  self.obscuration
 
         wavefront_ideal = wavefront.copy()
-        wavefront_ideal.wavefront=np.ones(wavefront.shape,dtype=np.complex128)
-        wavefront_ideal *=  self.inputpupil
+        wavefront_ideal.wavefront=np.ones(wavefront.shape)
+        #wavefront_ideal *=  self.inputpupil
 
         if (offset_x!=0) or (offset_y !=0):
             wavefront.tilt(Xangle=offset_x, Yangle=offset_y)
@@ -323,7 +323,7 @@ class NullingCoronagraph(poppy.OpticalSystem):
         #interfere the arms, accounting for fractional intensity mismatch between the arms: 
         if self.store_pupil:  
             self.pupil_plane_raw = wavefront.copy()     
-            self.pupil_plane_unmasked_dm_arm = wavefront_arm.copy()
+            self.pupil_plane_umasked_dm_arm = wavefront_arm.copy()
 
         
         wavefront_combined = 0.5*(1.0 - self.intensity_mismatch)*wavefront.wavefront + 0.5*(-1.0)*wavefront_arm.wavefront
