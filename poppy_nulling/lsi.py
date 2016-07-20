@@ -7,7 +7,7 @@ Units of length are meters.
 import numpy as np
 import poppy 
 
-def _sheararray(inputarray,shear,pixelscale,axis='y',wrap=False):
+def _sheararray(inputarray,shear,pixelscale,axis='x',wrap=False):
     """
 
     Parameters
@@ -61,7 +61,11 @@ def _sheararray(inputarray,shear,pixelscale,axis='y',wrap=False):
                 sheared=np.pad(inputarray,((+npix_shear,0),(0,0)), mode='constant')[:-npix_shear,:]               
     return sheared
 
-def shearing_nuller(wavefront,shear=0.0,bright=False,shear_axis='x'):
+def shearing_nuller(wavefront,
+                    shear=0.0,
+                    one_arm_error=None,
+                    bright=False,
+                    shear_axis='x'):
         
     """
     Interferes a wavefront with itself via lateral shearing. 
@@ -74,6 +78,8 @@ def shearing_nuller(wavefront,shear=0.0,bright=False,shear_axis='x'):
         Wavefront to mask.
     input_aperture : poppy.OpticalElement
         optical element used to define the initial beams
+    one_arm_error :   scalar or poppy.OpticalElement
+        simulate a difference between the arms by multiplying one of the interferometer arms by this quantity 
     shear : float
         The lateral shear between interferred wavefronts. Units of meters.
     bright : bool
@@ -84,8 +90,12 @@ def shearing_nuller(wavefront,shear=0.0,bright=False,shear_axis='x'):
     
     
     """
+    
     wavefront_arm = wavefront.copy()
+
     wavefront_arm.wavefront = _sheararray(wavefront_arm.wavefront,shear,wavefront_arm.pixelscale,axis=shear_axis) #sheared
+    if one_arm_error is not None:
+        wavefront_arm *= one_arm_error
     if not bright:
         #the dark output
         wavefront.wavefront = 0.5*wavefront.wavefront + 0.5*(-1.0)*wavefront_arm.wavefront
